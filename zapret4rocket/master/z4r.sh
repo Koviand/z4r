@@ -50,9 +50,9 @@ done
 if [ "$missing_libs" -ne 0 ]; then
  echo "Не найдены нужные файлы в $LIB_DIR. Запускаю внешний z4r..."
  if command -v curl >/dev/null 2>&1; then
- exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/Koviand/z4r/main/z4r" | sh'
+ exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/Koviand/z4r/4/z4r/main/z4r" | sh'
  elif command -v wget >/dev/null 2>&1; then
- exec sh -c 'wget -qO- "https://raw.githubusercontent.com/Koviand/z4r/main/z4r" | sh'
+ exec sh -c 'wget -qO- "https://raw.githubusercontent.com/Koviand/z4r/4/z4r/main/z4r" | sh'
  else
  echo "Ошибка: нет curl или wget для загрузки внешнего z4r."
  exit 1
