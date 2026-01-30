@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z4r - Веб-интерфейс управления</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>z4r Web Interface</h1>
+            <div class="header-info">
+                <span id="provider-info">Загрузка...</span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Дашборд</button>
+            <button class="tab-btn" data-tab="strategies">Стратегии</button>
+            <button class="tab-btn" data-tab="config">Конфигурация</button>
+            <button class="tab-btn" data-tab="domains">Домены</button>
+            <button class="tab-btn" data-tab="monitoring">Мониторинг</button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="status-cards">
+                <div class="card">
+                    <h3>Статус Zapret</h3>
+                    <div class="status-indicator" id="zapret-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Проверка...</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="controlZapret('start')">Запустить</button>
+                        <button class="btn btn-danger" onclick="controlZapret('stop')">Остановить</button>
+                        <button class="btn btn-secondary" onclick="controlZapret('restart')">Перезапустить</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Текущие стратегии</h3>
+                    <div id="strategies-display">
+                        <div class="strategy-item">
+                            <span class="strategy-label">YT UDP:</span>
+                            <span class="strategy-value" id="strat-udp">-</span>
+                        </div>
+                        <div class="strategy-item">
+                            <span class="strategy-label">YT TCP:</span>
+                            <span class="strategy-value" id="strat-tcp">-</span>
+                        </div>
+                        <div class="strategy-item">
+                            <span class="strategy-label">YT GV:</span>
+                            <span class="strategy-value" id="strat-gv">-</span>
+                        </div>
+                        <div class="strategy-item">
+                            <span class="strategy-label">RKN:</span>
+                            <span class="strategy-value" id="strat-rkn">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Конфигурация</h3>
+                    <div id="config-display">
+                        <div class="config-item">
+                            <span class="config-label">Firewall:</span>
+                            <span class="config-value" id="config-fwtype">-</span>
+                        </div>
+                        <div class="config-item">
+                            <span class="config-label">Flow Offload:</span>
+                            <span class="config-value" id="config-flowoffload">-</span>
+                        </div>
+                        <div class="config-item">
+                            <span class="config-label">Bol-van режим:</span>
+                            <span class="config-value" id="config-bolvan">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategies Tab -->
+        <div id="strategies" class="tab-content">
+            <div class="section">
+                <h2>Управление стратегиями</h2>
+                <div class="strategies-grid">
+                    <div class="strategy-card">
+                        <h3>YouTube UDP QUIC</h3>
+                        <p>8 вариантов стратегий</p>
+                        <button class="btn btn-primary" onclick="openStrategyModal('udp_yt')">Подобрать</button>
+                    </div>
+                    <div class="strategy-card">
+                        <h3>YouTube TCP</h3>
+                        <p>17 вариантов стратегий</p>
+                        <button class="btn btn-primary" onclick="openStrategyModal('tcp_yt')">Подобрать</button>
+                    </div>
+                    <div class="strategy-card">
+                        <h3>YouTube GV</h3>
+                        <p>17 вариантов стратегий</p>
+                        <button class="btn btn-primary" onclick="openStrategyModal('tcp_gv')">Подобрать</button>
+                    </div>
+                    <div class="strategy-card">
+                        <h3>RKN</h3>
+                        <p>17 вариантов стратегий</p>
+                        <button class="btn btn-primary" onclick="openStrategyModal('tcp_rkn')">Подобрать</button>
+                    </div>
+                    <div class="strategy-card">
+                        <h3>Кастомный домен</h3>
+                        <p>Подбор для отдельного домена</p>
+                        <button class="btn btn-primary" onclick="openCustomDomainModal()">Подобрать</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Tab -->
+        <div id="config" class="tab-content">
+            <div class="section">
+                <h2>Настройки конфигурации</h2>
+                <div class="config-controls">
+                    <div class="config-control">
+                        <label>Firewall Type:</label>
+                        <select id="fwtype-select">
+                            <option value="iptables">iptables</option>
+                            <option value="nftables">nftables</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="toggleConfig('fwtype')">Переключить</button>
+                    </div>
+                    <div class="config-control">
+                        <label>Bol-van режим:</label>
+                        <button class="btn btn-secondary" onclick="toggleConfig('bolvan')">Переключить</button>
+                    </div>
+                    <div class="config-control">
+                        <label>UDP диапазон (1026-65531):</label>
+                        <button class="btn btn-secondary" onclick="toggleConfig('udp_range')">Переключить</button>
+                    </div>
+                </div>
+                <div class="config-editor">
+                    <h3>Редактирование конфигурации</h3>
+                    <textarea id="config-editor" rows="20"></textarea>
+                    <button class="btn btn-primary" onclick="saveConfig()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Domains Tab -->
+        <div id="domains" class="tab-content">
+            <div class="section">
+                <h2>Управление исключениями</h2>
+                <div class="domain-input">
+                    <input type="text" id="domain-input" placeholder="Введите домен (например: example.com)">
+                    <button class="btn btn-primary" onclick="addDomain()">Добавить</button>
+                </div>
+                <div class="domains-list" id="domains-list">
+                    <p>Загрузка списка доменов...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monitoring Tab -->
+        <div id="monitoring" class="tab-content">
+            <div class="section">
+                <h2>Мониторинг доступности</h2>
+                <button class="btn btn-primary" onclick="checkAccess()">Проверить доступность</button>
+                <div id="monitoring-results" class="monitoring-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
