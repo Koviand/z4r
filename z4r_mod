@@ -72,6 +72,42 @@ if $DL_CMD "${INSTALL_DIR}/zapret/web_config.json" $DL_TIMEOUT "${RAW_URL}/zapre
     echo "✓ web_config.json загружен"
 fi
 
+# Загрузка файлов веб-интерфейса
+echo "Загрузка веб-интерфейса..."
+mkdir -p "${INSTALL_DIR}/zapret/web/api" "${INSTALL_DIR}/zapret/web/utils" "${INSTALL_DIR}/zapret/web/static/css" "${INSTALL_DIR}/zapret/web/static/js"
+
+# Основные файлы веб-интерфейса
+WEB_FILES="web/__init__.py web/app.py web/requirements.txt"
+for file in $WEB_FILES; do
+    if $DL_CMD "${INSTALL_DIR}/zapret/${file}" $DL_TIMEOUT "${RAW_URL}/zapret4rocket/${file}" 2>/dev/null; then
+        echo "  ✓ ${file}"
+    fi
+done
+
+# API файлы
+API_FILES="web/api/__init__.py web/api/status.py web/api/control.py web/api/strategies.py web/api/config.py web/api/domains.py web/api/monitoring.py"
+for file in $API_FILES; do
+    if $DL_CMD "${INSTALL_DIR}/zapret/${file}" $DL_TIMEOUT "${RAW_URL}/zapret4rocket/${file}" 2>/dev/null; then
+        echo "  ✓ ${file}"
+    fi
+done
+
+# Utils файлы
+UTILS_FILES="web/utils/__init__.py web/utils/shell_exec.py"
+for file in $UTILS_FILES; do
+    if $DL_CMD "${INSTALL_DIR}/zapret/${file}" $DL_TIMEOUT "${RAW_URL}/zapret4rocket/${file}" 2>/dev/null; then
+        echo "  ✓ ${file}"
+    fi
+done
+
+# Статические файлы
+STATIC_FILES="web/static/index.html web/static/css/style.css web/static/js/app.js"
+for file in $STATIC_FILES; do
+    if $DL_CMD "${INSTALL_DIR}/zapret/${file}" $DL_TIMEOUT "${RAW_URL}/zapret4rocket/${file}" 2>/dev/null; then
+        echo "  ✓ ${file}"
+    fi
+done
+
 echo ""
 echo "=== Запуск z4r.sh ==="
 cd "${INSTALL_DIR}" || exit 1
