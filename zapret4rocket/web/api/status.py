@@ -61,6 +61,19 @@ def get_config_status():
 @bp.route('/all', methods=['GET'])
 def get_all_status():
     """Получить весь статус системы"""
+    # Получаем полную информацию о конфигурации
+    udp_ports = shell_exec.get_config_value('NFQWS_PORTS_UDP') or 'Неизвестно'
+    
+    # Определяем режим bol-van
+    bolvan_mode = 'Неизвестно'
+    if '443,1400,3478-3481,5349,50000-50099,19294-19344' in udp_ports:
+        bolvan_mode = 'Классические стратегии'
+    elif udp_ports == '443':
+        bolvan_mode = 'Скрипты'
+    
+    # Определяем UDP диапазон
+    udp_range_enabled = '1026-65531' in udp_ports
+    
     return jsonify({
         'zapret': shell_exec.get_zapret_status(),
         'strategies': shell_exec.get_strategies_info(),
@@ -68,6 +81,8 @@ def get_all_status():
         'config': {
             'fwtype': shell_exec.get_config_value('FWTYPE') or 'Неизвестно',
             'flowoffload': shell_exec.get_config_value('FLOWOFFLOAD') or 'Неизвестно',
-            'udp_ports': shell_exec.get_config_value('NFQWS_PORTS_UDP') or 'Неизвестно',
+            'udp_ports': udp_ports,
+            'bolvan_mode': bolvan_mode,
+            'udp_range_enabled': udp_range_enabled,
         }
     })

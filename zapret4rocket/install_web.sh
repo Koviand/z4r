@@ -1,6 +1,7 @@
 #!/bin/bash
 # Скрипт установки веб-интерфейса для z4r
 
+# Используем set -e для строгой проверки ошибок, но обрабатываем ошибки установки pip отдельно
 set -e
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -47,12 +48,14 @@ fi
 
 # Установка зависимостей
 echo -e "${yellow}Установка зависимостей Python...${plain}"
+set +e  # Временно отключаем set -e для установки pip
 $PIP_CMD install --upgrade pip || true
-$PIP_CMD install flask flask-cors || {
+if ! $PIP_CMD install flask flask-cors; then
     echo -e "${red}Ошибка установки зависимостей. Попробуйте установить вручную:${plain}"
     echo -e "${yellow}$PIP_CMD install flask flask-cors${plain}"
     exit 1
-}
+fi
+set -e  # Включаем обратно set -e
 
 # Проверка наличия веб-директории
 if [ ! -d "$WEB_DIR" ]; then
@@ -131,7 +134,7 @@ START=99
 
 start_service() {
     cd $WEB_DIR
-    $(which python3) $WEB_DIR/app.py > /dev/null 2>&1 &
+    $(which python3) $WEB_DIR/app.py > /tmp/${SERVICE_NAME}.log 2>&1 &
     echo \$! > /var/run/${SERVICE_NAME}.pid
 }
 

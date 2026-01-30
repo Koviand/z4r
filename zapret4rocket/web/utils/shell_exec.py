@@ -109,11 +109,16 @@ def safe_execute(command: List[str], cwd: Optional[str] = None,
         if not command or not isinstance(command, list):
             return (1, "", "Invalid command")
         
-        # Проверка на опасные команды
+        # Проверка на опасные команды (базовая валидация)
+        # Для безопасности мы разрешаем только определенные команды
+        # Но для гибкости проверяем только критичные случаи
         cmd_name = command[0] if command else ""
-        if cmd_name not in SAFE_COMMANDS.get(cmd_name, []):
-            # Разрешаем только определенные команды
-            pass
+        
+        # Блокируем опасные команды
+        dangerous_commands = ['rm', 'dd', 'mkfs', 'fdisk', 'shutdown', 'reboot', 'halt']
+        if cmd_name in dangerous_commands:
+            logger.warning(f"Blocked dangerous command: {cmd_name}")
+            return (1, "", f"Dangerous command blocked: {cmd_name}")
         
         result = subprocess.run(
             command,
@@ -235,24 +240,6 @@ def get_strategies_info() -> Dict:
             if os.path.exists(strat_file) and os.path.getsize(strat_file) > 0:
                 strategies['rkn'] = str(i)
                 break
-    
-    return strategies
-    
-    # Парсинг результата
-    strategies = {
-        'yt_udp': 'Def',
-        'yt_tcp': 'Def',
-        'yt_gv': 'Def',
-        'rkn': 'Def'
-    }
-    
-    if stdout:
-        # Парсим строку вида "YT_UDP:1 YT_TCP:2 YT_GV:3 RKN:4"
-        matches = re.findall(r'(\w+):(\w+)', stdout)
-        for key, value in matches:
-            key_lower = key.lower()
-            if key_lower in strategies:
-                strategies[key_lower] = value
     
     return strategies
 

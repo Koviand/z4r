@@ -610,7 +610,7 @@ web_interface_menu() {
           /opt/etc/init.d/S99z4r-web start 2>/dev/null || echo -e "${red}Ошибка запуска${plain}"
         else
           echo -e "${yellow}Запуск вручную...${plain}"
-          cd "$SCRIPT_DIR/web" && nohup python3 app.py > /dev/null 2>&1 &
+          cd "$SCRIPT_DIR/web" && nohup python3 app.py > /tmp/z4r-web.log 2>&1 &
           echo -e "${green}Веб-интерфейс запущен${plain}"
         fi
         sleep 2
@@ -641,7 +641,7 @@ web_interface_menu() {
         else
           pkill -f "python3.*app.py" 2>/dev/null || pkill -f "python.*app.py" 2>/dev/null || true
           sleep 1
-          cd "$SCRIPT_DIR/web" && nohup python3 app.py > /dev/null 2>&1 &
+          cd "$SCRIPT_DIR/web" && nohup python3 app.py > /tmp/z4r-web.log 2>&1 &
         fi
         sleep 2
         echo -e "${green}Веб-интерфейс перезапущен${plain}"

@@ -87,8 +87,10 @@ def toggle_setting(setting):
         
         # Обновляем конфигурацию через sed
         config_path = get_config_path()
+        # Санитизируем значение перед использованием в sed
+        safe_value = shell_exec.sanitize_input(new_value, max_length=50)
         exit_code, stdout, stderr = shell_exec.safe_execute([
-            'sed', '-i', f's/^FWTYPE=.*/FWTYPE={new_value}/', config_path
+            'sed', '-i', f's/^FWTYPE=.*/FWTYPE={safe_value}/', config_path
         ])
         
         if exit_code == 0:
@@ -112,6 +114,7 @@ def toggle_setting(setting):
         if '443,1400' in udp_ports:
             # Переключаем на скрипты
             config_path = get_config_path()
+            # Используем безопасные команды sed с экранированием специальных символов
             shell_exec.safe_execute([
                 'sed', '-i', 's/443,1400,3478-3481,5349,50000-50099,19294-19344$/443/', config_path
             ])

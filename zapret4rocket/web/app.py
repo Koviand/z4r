@@ -10,11 +10,23 @@ from flask import Flask, jsonify, request, send_from_directory, render_template_
 from flask_cors import CORS
 
 # Импорт утилит
+import sys
+
+# Добавляем текущую директорию в путь для импортов
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from web.utils import shell_exec
 
+# Определяем путь к статическим файлам
+base_dir = os.path.dirname(os.path.abspath(__file__))
+static_folder_path = os.path.join(base_dir, 'static')
+
 app = Flask(__name__, 
-            static_folder='static',
-            static_url_path='/static')
+            static_folder=static_folder_path,
+            static_url_path='/static',
+            template_folder=static_folder_path)
 CORS(app)  # Разрешаем CORS для локального использования
 
 # Конфигурация
@@ -55,10 +67,12 @@ except ImportError as e:
 @app.route('/')
 def index():
     """Главная страница"""
-    html_path = os.path.join(app.static_folder, 'index.html')
-    if os.path.exists(html_path):
-        with open(html_path, 'r', encoding='utf-8') as f:
-            return f.read()
+    # Используем абсолютный путь к статическим файлам
+    if app.static_folder and os.path.exists(app.static_folder):
+        html_path = os.path.join(app.static_folder, 'index.html')
+        if os.path.exists(html_path):
+            with open(html_path, 'r', encoding='utf-8') as f:
+                return f.read()
     return render_template_string('''
     <!DOCTYPE html>
     <html>
