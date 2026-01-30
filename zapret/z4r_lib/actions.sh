@@ -1,7 +1,15 @@
 backup_strats() {
- # В автоматическом режиме пропускаем бэкап
- if [ "$INSTALL_MODE" != "manual" ] && [ -n "$INSTALL_MODE" ]; then
-  echo -e "${yellow}Автоматический режим: бэкап стратегий пропущен${plain}"
+ # В автоматическом режиме делаем бэкап автоматически
+ if [ "$AUTO_MODE" = "1" ]; then
+  if [ -d /opt/zapret/extra_strats ]; then
+   rm -rf /opt/extra_strats 2>/dev/null || true
+   cp -rf /opt/zapret/extra_strats /opt/ || true
+   echo -e "${green}Автоматический режим: бэкап extra_strats сохранён в /opt/extra_strats${plain}"
+  fi
+  if [ -f /opt/zapret/lists/netrogat.txt ]; then
+   cp -f /opt/zapret/lists/netrogat.txt /opt/netrogat.txt || true
+   echo -e "${green}Автоматический режим: бэкап netrogat.txt сохранён в /opt/netrogat.txt${plain}"
+  fi
   return 0
  fi
 

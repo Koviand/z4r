@@ -28,13 +28,6 @@ Bblue='\033[44m'
 Bpink='\033[45m'
 Bcyan='\033[46m'
 
-#___Переменные окружения для автоматической установки___#
-# Z4R_INSTALL_MODE - режим установки (manual/minimal/standard/full)
-# Z4R_ZAPRET_VERSION - версия zapret (если не указана, используется последняя)
-# Z4R_INSTALL_PANEL - панель туннелирования (3xui/marzban/wg/3proxy, только для VPS)
-# Z4R_TTYD_LOGIN - логин для ttyd (пустой = без логина, "0" = отключить ttyd)
-INSTALL_MODE="${Z4R_INSTALL_MODE:-}"
-
 #___Проверка на наличие необходимых библиотек___#
 
 #Определяем путь скрипта, подгружаем функции
@@ -65,9 +58,9 @@ fi
 if [ "$missing_libs" -ne 0 ]; then
  echo "Не найдены нужные файлы в $SCRIPT_DIR/lib или $SCRIPT_DIR/zapret/z4r_lib. Запускаю внешний z4r..."
  if command -v curl >/dev/null 2>&1; then
- exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/IndeecFOX/z4r/main/z4r" | sh'
+ exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/Koviand/z4r/4/z4r" | sh'
  elif command -v wget >/dev/null 2>&1; then
- exec sh -c 'wget -qO- "https://raw.githubusercontent.com/IndeecFOX/z4r/main/z4r" | sh'
+ exec sh -c 'wget -qO- "https://raw.githubusercontent.com/Koviand/z4r/4/z4r" | sh'
  else
  echo "Ошибка: нет curl или wget для загрузки внешнего z4r."
  exit 1
@@ -182,22 +175,14 @@ remove_zapret() {
 
 #Запрос желаемой версии zapret
 version_select() {
- # Если версия задана через переменную окружения, используем её
- if [ -n "$Z4R_ZAPRET_VERSION" ]; then
-  VER="$Z4R_ZAPRET_VERSION"
-  echo -e "${green}Версия zapret задана через переменную окружения: $VER${plain}"
-  return 0
- fi
-
  # В автоматическом режиме используем последнюю версию без запроса
- if [ "$INSTALL_MODE" != "manual" ] && [ -n "$INSTALL_MODE" ]; then
-  echo -e "${yellow}Автоматический режим: используется последняя версия zapret${plain}"
-  VER=""  # Устанавливаем пустую строку для автоматического получения последней версии
+ if [ "$AUTO_MODE" = "1" ]; then
+  VER=""
+  echo -e "${green}Автоматический режим: используется последняя версия zapret${plain}"
  fi
-
+ 
  while true; do
-  # В ручном режиме запрашиваем версию
-  if [ "$INSTALL_MODE" = "manual" ] || [ -z "$INSTALL_MODE" ]; then
+  if [ "$AUTO_MODE" = "0" ]; then
    read -re -p $'\033[0;32mВведите желаемую версию zapret (Enter для новейшей версии): \033[0m' VER
   fi
   # Если пустой ввод — берем значение по умолчанию
@@ -243,14 +228,11 @@ version_select() {
  echo "Некорректный формат версии. Пример: 72.3"
  continue
  fi
- echo "Будет использоваться версия: $VER"
- break
+  if [ "$AUTO_MODE" = "0" ]; then
+   echo "Будет использоваться версия: $VER"
+  fi
+  break
  done
-
- # В автоматическом режиме выходим после первого прохода
- if [ "$INSTALL_MODE" != "manual" ] && [ -n "$INSTALL_MODE" ]; then
-  return 0
- fi
 }
 
 #Скачивание, распаковка архива zapret, очистка от ненуных бинарей
@@ -272,7 +254,9 @@ install_zapret_reboot() {
  sh -i /opt/zapret/install_easy.sh
  /opt/zapret/init.d/sysv/zapret restart
  if pidof nfqws >/dev/null; then
- check_access_list
+ if [ "$AUTO_MODE" = "0" ]; then
+  check_access_list
+ fi
  echo -e "\033[32mzapret перезапущен и полностью установлен\n\033[33mЕсли требуется меню (например не работают какие-то ресурсы) - введите скрипт ещё раз или просто напишите "z4r" в терминале. Саппорт: tg: zee4r\033[0m"
  else
  echo -e "${yellow}zapret полностью установлен, но не обнаружен после запуска в исполняемых задачах через pidof\nСаппорт: tg: zee4r${plain}"
@@ -326,82 +310,47 @@ entware_fixes() {
 
 #Запрос на установку 3x-ui или аналогов
 get_panel() {
- local answer_panel=""
- local clean_answer=""
-
- # В автоматическом режиме "full" для VPS устанавливаем 3x-ui по умолчанию
- if [[ "$INSTALL_MODE" == "full" ]] && [[ "$OSystem" == "VPS" ]]; then
-  if [ -n "$Z4R_INSTALL_PANEL" ]; then
-   clean_answer=$(echo "$Z4R_INSTALL_PANEL" | tr '[:lower:]' '[:upper:]')
-  else
-   clean_answer="3XUI"
-   echo -e "${green}Автоматический режим: установка панели 3x-ui${plain}"
-  fi
- elif [[ "$INSTALL_MODE" != "manual" ]] && [[ -n "$INSTALL_MODE" ]]; then
-  echo "Автоматический режим: установка панели туннелирования пропущена"
+ # В автоматическом режиме пропускаем установку панели
+ if [ "$AUTO_MODE" = "1" ]; then
+  echo "Автоматический режим: пропуск установки ПО туннелирования."
   return 0
- else
-  # Ручной режим - запрашиваем у пользователя
-  read -re -p $'\033[33mУстановить ПО для туннелирования?\033[0m \033[32m(3xui, marzban, wg, 3proxy или Enter для пропуска): \033[0m' answer_panel
-  # Удаляем лишние символы и пробелы, приводим к верхнему регистру
-  clean_answer=$(echo "$answer_panel" | tr '[:lower:]' '[:upper:]')
  fi
-
+ 
+ read -re -p $'\033[33mУстановить ПО для туннелирования?\033[0m \033[32m(3xui, marzban, wg, 3proxy или Enter для пропуска): \033[0m' answer_panel
+ # Удаляем лишние символы и пробелы, приводим к верхнему регистру
+ clean_answer=$(echo "$answer_panel" | tr '[:lower:]' '[:upper:]')
  if [[ -z "$clean_answer" ]]; then
   echo "Пропуск установки ПО туннелирования."
  elif [[ "$clean_answer" == "3XUI" ]]; then
-  echo "Установка 3x-ui панели."
-  bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+ echo "Установка 3x-ui панели."
+ bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
  elif [[ "$clean_answer" == "WG" ]]; then
-  echo "Установка WG (by angristan)"
-  bash <(curl -Ls https://raw.githubusercontent.com/angristan/wireguard-install/refs/heads/master/wireguard-install.sh)
+ echo "Установка WG (by angristan)"
+ bash <(curl -Ls https://raw.githubusercontent.com/angristan/wireguard-install/refs/heads/master/wireguard-install.sh)
  elif [[ "$clean_answer" == "3PROXY" ]]; then
-  echo "Установка 3proxy (by SnoyIatk). Доустановка с apt build-essential для сборки (debian/ubuntu)"
-  apt update && apt install build-essential
-  bash <(curl -Ls https://raw.githubusercontent.com/SnoyIatk/3proxy/master/3proxyinstall.sh)
-  curl -L -o /etc/3proxy/.proxyauth https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/del.proxyauth
-  curl -L -o /etc/3proxy/3proxy.cfg https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/3proxy.cfg
+ echo "Установка 3proxy (by SnoyIatk). Доустановка с apt build-essential для сборки (debian/ubuntu)"
+ apt update && apt install build-essential
+ bash <(curl -Ls https://raw.githubusercontent.com/SnoyIatk/3proxy/master/3proxyinstall.sh)
+ curl -L -o /etc/3proxy/.proxyauth https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/del.proxyauth
+ curl -L -o /etc/3proxy/3proxy.cfg https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/3proxy.cfg
  elif [[ "$clean_answer" == "MARZBAN" ]]; then
-  echo "Установка Marzban"
-  bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
+ echo "Установка Marzban"
+ bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
  else
-  echo "Пропуск установки ПО туннелирования."
+ echo "Пропуск установки ПО туннелирования."
  fi
 }
 
 #webssh ttyd
 ttyd_webssh() {
- local ttyd_login=""
-
- # В автоматическом режиме "standard" или "full" используем пустой логин
- if [[ "$INSTALL_MODE" == "standard" ]] || [[ "$INSTALL_MODE" == "full" ]]; then
-  if [ -n "$Z4R_TTYD_LOGIN" ]; then
-   ttyd_login="$Z4R_TTYD_LOGIN"
-  else
-   ttyd_login=""
-   echo -e "${green}Автоматический режим: web-SSH без логина${plain}"
-  fi
- elif [[ "$INSTALL_MODE" == "minimal" ]]; then
-  echo "Автоматический режим минимальный: установка web-SSH пропущена"
-  return 0
- else
-  # Ручной режим - запрашиваем у пользователя
-  echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z4r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
-  read -re -p '' ttyd_login
-  echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
- fi
-
- # Если логин = "0", отключаем ttyd
- if [[ "$ttyd_login" == "0" ]]; then
-  echo "Отключение установки web-SSH"
-  return 0
- fi
+ echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z4r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
+ read -re -p '' ttyd_login
+ echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
  
- # Формируем параметр для ttyd
- if [[ -z "$ttyd_login" ]]; then
-  ttyd_login_have=""
- else
-  ttyd_login_have="-c "${ttyd_login}": bash z4r"
+ ttyd_login_have="-c "${ttyd_login}": bash z4r"
+ if [[ "$ttyd_login" == "0" ]]; then
+ echo "Отключение логина в веб. Перевод с z4r на CLI логин."
+ ttyd_login_have="login"
  fi
  
  if [[ "$OSystem" == "VPS" ]]; then
@@ -417,7 +366,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ttyd -p 17681 -W ${ttyd_login_have} bash z4r
+ExecStart=/usr/bin/ttyd -p 17681 -W -a ${ttyd_login_have} bash z4r
 Restart=always
 RestartSec=5
 
@@ -432,11 +381,7 @@ EOF
  /etc/init.d/ttyd stop 2>/dev/null || true
  opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
  uci set ttyd.@ttyd[0].interface=''
- if [[ -n "$ttyd_login_have" ]]; then
-  uci set ttyd.@ttyd[0].command="-p 17681 -W -a ${ttyd_login_have}"
- else
-  uci set ttyd.@ttyd[0].command="-p 17681 -W"
- fi
+ uci set ttyd.@ttyd[0].command="-p 17681 -W -a ${ttyd_login_have}"
  uci commit ttyd
  /etc/init.d/ttyd enable
  /etc/init.d/ttyd start
@@ -449,7 +394,7 @@ EOF
 #!/bin/sh
 ENABLED=yes
 PROCS=ttyd
-ARGS="-p 17681 -W ${ttyd_login_have} bash z4r"
+ARGS="-p 17681 -W -a ${ttyd_login_have} bash z4r"
 PREARGS=""
 DESC=\$PROCS
 PATH=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -466,11 +411,7 @@ EOF
  else
  echo -e "Проверка...${red}Служба ttyd не запущена! Если у вас Entware, то после перезагрузки роутера служба скорее всего заработает!${plain}"
  fi
- if [[ -n "$ttyd_login" ]]; then
-  echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}логин: ${ttyd_login} пароль - не используется.${plain} Был выполнен выход из скрипта для сохранения состояния."
- else
-  echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}без логина (не рекомендуется для публичных IP!).${plain} Был выполнен выход из скрипта для сохранения состояния."
- fi
+ echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}логин: ${ttyd_login} пароль - не испольузется.${plain} Был выполнен выход из скрипта для сохранения состояния."
 }
 
 #Меню, проверка состояний и вывод с чтением ответа
@@ -725,56 +666,35 @@ esac
 fi
 
 #Выбор режима установки
-select_install_mode() {
- # Если режим уже задан через переменную окружения, используем его
- if [ -n "$INSTALL_MODE" ]; then
-  case "$INSTALL_MODE" in
-   "manual"|"minimal"|"standard"|"full")
-    echo -e "${green}Режим установки задан через переменную окружения: ${INSTALL_MODE}${plain}"
-    return 0
-    ;;
-   *)
-    echo -e "${yellow}Неизвестный режим установки: ${INSTALL_MODE}. Используется меню выбора.${plain}"
-    INSTALL_MODE=""
-    ;;
-  esac
- fi
-
- # Если режим не задан, показываем меню выбора
- if [ -z "$INSTALL_MODE" ]; then
-  echo ""
-  echo -e "${cyan}=== Выбор режима установки ===${plain}"
-  echo -e "${yellow}Выберите режим установки:${plain}"
-  echo -e "  ${green}1${plain} - Ручная установка (все запросы интерактивные)"
-  echo -e "  ${green}2${plain} - Минимальная автоматическая (только zapret)"
-  echo -e "  ${green}3${plain} - Стандартная автоматическая (zapret + web-SSH без логина)"
-  echo -e "  ${green}4${plain} - Полная автоматическая (zapret + web-SSH + панель туннелирования)"
-  echo ""
-  read -re -p "Ваш выбор (1-4, Enter для ручной): " mode_choice
-  
-  case "$mode_choice" in
-   "1"|"")
-    INSTALL_MODE="manual"
-    ;;
-   "2")
-    INSTALL_MODE="minimal"
-    ;;
-   "3")
-    INSTALL_MODE="standard"
-    ;;
-   "4")
-    INSTALL_MODE="full"
-    ;;
-   *)
-    echo -e "${yellow}Неверный выбор. Используется ручной режим.${plain}"
-    INSTALL_MODE="manual"
-    ;;
-  esac
- fi
-
- echo -e "${green}Выбран режим: ${INSTALL_MODE}${plain}"
+AUTO_MODE=0
+export AUTO_MODE
+# Если передан аргумент "1" - автоматический режим, иначе - интерактивный выбор
+if [ "$1" = "1" ]; then
+ AUTO_MODE=1
+ echo -e "${green}Автоматический режим установки активирован${plain}"
  echo ""
-}
+elif [ ! $1 ]; then
+ echo ""
+ echo -e "${cyan}=== Режим установки ===${plain}"
+ echo -e "${yellow}Выберите режим установки:${plain}"
+ echo -e "  ${green}1${plain} - Ручной режим (требуется ввод от пользователя)"
+ echo -e "  ${green}2${plain} - Полностью автоматический режим"
+ read -re -p $'\033[33mВаш выбор (1 или 2, Enter = 1): \033[0m' install_mode
+ if [ -z "$install_mode" ]; then
+  install_mode="1"
+ fi
+ case "$install_mode" in
+  "2")
+   AUTO_MODE=1
+   echo -e "${green}Выбран автоматический режим установки${plain}"
+   ;;
+  *)
+   AUTO_MODE=0
+   echo -e "${green}Выбран ручной режим установки${plain}"
+   ;;
+ esac
+ echo ""
+fi
 
 #Инфа о времени обновления скрпта
 commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
@@ -810,20 +730,10 @@ if [[ -z "$(curl -s --max-time 10 "https://raw.githubusercontent.com/test")" ]];
  fi
 fi
 
-#Выбор режима установки (если zapret еще не установлен)
-if [ ! -d /opt/zapret/extra_strats ] || [ ! -f "/opt/zapret/config" ]; then
- select_install_mode
-fi
-
 #Выполнение общего для всех ОС кода с ответвлениями под ОС
 #Запрос на установку 3x-ui или аналогов для VPS
-# В автоматическом режиме "full" панель устанавливается автоматически
 if [[ "$OSystem" == "VPS" ]] && [ ! $1 ]; then
- if [[ "$INSTALL_MODE" == "full" ]]; then
-  get_panel
- elif [[ "$INSTALL_MODE" == "manual" ]] || [ -z "$INSTALL_MODE" ]; then
-  get_panel
- fi
+ get_panel
 fi
 
 #Меню и быстрый запуск подбора стратегии
@@ -831,7 +741,13 @@ fi
  if [ $1 ]; then
  Strats_Tryer $1
  fi
- get_menu
+ # В автоматическом режиме не показываем меню после установки
+ if [ "$AUTO_MODE" = "0" ]; then
+  get_menu
+ else
+  echo -e "${green}Автоматическая установка завершена успешно!${plain}"
+  echo -e "${yellow}Для доступа к меню управления запустите скрипт ещё раз или введите 'z4r' в терминале.${plain}"
+ fi
  fi
  
 #entware keenetic and merlin preinstal env.
@@ -857,21 +773,17 @@ echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api
 version_select
 
 #Запрос на установку web-ssh
-# В автоматическом режиме "standard" или "full" устанавливаем ttyd автоматически
-if [[ "$INSTALL_MODE" == "standard" ]] || [[ "$INSTALL_MODE" == "full" ]]; then
- echo -e "${green}Автоматический режим: установка web-SSH${plain}"
- ttyd_webssh
-elif [[ "$INSTALL_MODE" == "minimal" ]]; then
- echo "Автоматический режим минимальный: установка web-SSH пропущена"
-elif [[ "$INSTALL_MODE" == "manual" ]] || [ -z "$INSTALL_MODE" ]; then
+if [ "$AUTO_MODE" = "1" ]; then
+ echo "Автоматический режим: пропуск установки web-терминала"
+else
  read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
  case "$ttyd_answer" in
   "1")
-  ttyd_webssh
-  ;;
+   ttyd_webssh
+   ;;
   *)
-  echo "Пропуск (пере)установки web-терминала"
-  ;;
+   echo "Пропуск (пере)установки web-терминала"
+   ;;
  esac
 fi 
  
