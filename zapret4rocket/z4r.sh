@@ -276,16 +276,12 @@ install_zapret_reboot() {
  if [ "$Z4R_NONINTERACTIVE" = "1" ] && [ -f /opt/zapret/common/installer.sh ]; then
   sed -i 's/if \[ -n "\$1" \] || ask_yes_no N "do you want to continue";/if true;/' /opt/zapret/common/installer.sh
  fi
- if [ "$Z4R_NONINTERACTIVE" = "1" ] && [ -f /opt/zapret/common/dialog.sh ]; then
-  # Патч bol-van/zapret common/dialog.sh: read_yes_no и ask_list используют дефолты без read
-  sed -i '/^ read A$/i\
- [ "$Z4R_NONINTERACTIVE" = "1" ] && { [ "$1" = "Y" ] || [ "$1" = "y" ] || [ "$1" = "1" ]; return; }
-' /opt/zapret/common/dialog.sh
-  sed -i '/^ n=1$/i\
- [ "$Z4R_NONINTERACTIVE" = "1" ] && { eval $1="\"$M_DEFAULT\""; echo "selected : $M_DEFAULT"; [ "$M_DEFAULT" != "$M_DEFAULT_VAR" ]; return; }
-' /opt/zapret/common/dialog.sh
+ if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+  # Пустой stdin — каждый read получает Enter, везде используются дефолты (firewall type, фильтр, списки и т.д.)
+  ( while true; do echo; done ) | sh -i /opt/zapret/install_easy.sh
+ else
+  sh -i /opt/zapret/install_easy.sh
  fi
- sh -i /opt/zapret/install_easy.sh
  /opt/zapret/init.d/sysv/zapret restart
  if pidof nfqws >/dev/null; then
   check_access_list
