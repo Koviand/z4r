@@ -367,7 +367,7 @@ get_panel() {
 }
 
 # Веб-панель z4r (без терминала)
-WEB_RAW_BASE="${WEB_RAW_BASE:-https://raw.githubusercontent.com/Koviand/z4r_web/main}"
+WEB_RAW_BASE="${WEB_RAW_BASE:-https://raw.githubusercontent.com/Koviand/z4r_web/4/zapret4rocket}"
 
 deploy_web_files() {
  mkdir -p /opt/zapret/web/scripts
@@ -420,7 +420,7 @@ Description=z4r Web Panel
 After=network.target
 
 [Service]
-ExecStart=$PYTHON3 /opt/zapret/web/server.py --port $PANEL_PORT --config $WEB_CONFIG
+ExecStart=$PYTHON3 /opt/zapret/web/server.py --port $PANEL_PORT --config /opt/zapret/web/.config
 Restart=always
 RestartSec=5
 
@@ -441,7 +441,7 @@ START=99
 case "\$1" in
   start)
     echo "Starting z4r web panel..."
-    $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config &
+    nohup $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config > /dev/null 2>&1 &
     ;;
   stop)
     echo "Stopping z4r web panel..."
@@ -472,7 +472,7 @@ START=99
 case "\$1" in
   start)
     echo "Starting z4r web panel..."
-    $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config &
+    nohup $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config > /dev/null 2>&1 &
     ;;
   stop)
     echo "Stopping z4r web panel..."

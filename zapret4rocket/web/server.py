@@ -22,10 +22,11 @@ AUTH = None  # "user:pass" for Basic Auth, or None
 
 def run_script(name, args=None):
     path = os.path.join(SCRIPTS_DIR, name)
-    if not os.path.isfile(path) or not os.access(path, os.X_OK):
+    if not os.path.isfile(path):
         return None, "script not found"
     try:
-        cmd = [path]
+        # Run via sh so we don't require execute bit (e.g. after curl download)
+        cmd = ["sh", path]
         if args:
             cmd.extend(args)
         out = subprocess.run(
