@@ -394,12 +394,14 @@ install_web_ui() {
   chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
  fi
 
- # Проверка наличия апплета httpd в busybox (--list или httpd --help)
+ # Проверка наличия апплета httpd в busybox (--list или httpd --help без "applet not found")
  _busybox_has_httpd() {
-  local b="$1"
+  local b="$1" out
   [ -z "$b" ] || ! command -v "$b" >/dev/null 2>&1 && return 1
   $b --list 2>/dev/null | grep -qw httpd && return 0
-  $b httpd --help 2>&1 | grep -qiE 'usage|httpd|port|\-p|\-h' && return 0
+  out=$($b httpd --help 2>&1)
+  echo "$out" | grep -qi "applet not found" && return 1
+  echo "$out" | grep -qi "usage" && return 0
   return 1
  }
  if [[ "$OSystem" == "VPS" ]]; then
@@ -467,7 +469,9 @@ START=99
 _has_httpd() {
   [ -z "$1" ] && return 1
   $1 --list 2>/dev/null | grep -qw httpd && return 0
-  $1 httpd --help 2>&1 | grep -qiE 'usage|httpd|port|\-p|\-h' && return 0
+  out=$($1 httpd --help 2>&1)
+  echo "$out" | grep -qi "applet not found" && return 1
+  echo "$out" | grep -qi "usage" && return 0
   return 1
 }
 case "$1" in
