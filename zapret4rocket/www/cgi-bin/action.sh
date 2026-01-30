@@ -1,8 +1,7 @@
 #!/bin/sh
 # CGI: perform whitelisted actions (start|stop|restart; optional fwtype, flowoffload)
 # GET only: QUERY_STRING e.g. action=restart
-
-printf 'Content-Type: application/json\r\n\r\n'
+# On success: 302 redirect to / so form submit returns to main page
 
 ZAPRET="/opt/zapret/init.d/sysv/zapret"
 CONFIG="/opt/zapret/config"
@@ -23,12 +22,20 @@ for pair in $QUERY_STRING; do
 done
 unset IFS
 
+_ok() {
+  printf 'Status: 302\r\nLocation: /\r\nContent-Type: text/html\r\n\r\n'
+  exit 0
+}
+_err() {
+  printf 'Content-Type: application/json\r\n\r\n{"ok":false,"error":"%s"}\n' "$1"
+  exit 0
+}
+
 # Prefer explicit action=start|stop|restart
 case "$action" in
   start|stop|restart)
     "$ZAPRET" "$action" 2>/dev/null
-    printf '{"ok":true}\n'
-    exit 0
+    _ok
     ;;
 esac
 
@@ -39,8 +46,7 @@ if [ -n "$flowoffload_val" ]; then
       sed -i "s/^FLOWOFFLOAD=.*/FLOWOFFLOAD=$flowoffload_val/" "$CONFIG" 2>/dev/null
       /opt/zapret/install_prereq.sh 2>/dev/null || true
       "$ZAPRET" restart 2>/dev/null
-      printf '{"ok":true}\n'
-      exit 0
+      _ok
       ;;
   esac
 fi
@@ -52,10 +58,9 @@ if [ -n "$fwtype_val" ]; then
       sed -i "s/^FWTYPE=.*/FWTYPE=$fwtype_val/" "$CONFIG" 2>/dev/null
       /opt/zapret/install_prereq.sh 2>/dev/null || true
       "$ZAPRET" restart 2>/dev/null
-      printf '{"ok":true}\n'
-      exit 0
+      _ok
       ;;
   esac
 fi
 
-printf '{"ok":false,"error":"Unknown or missing action"}\n'
+_err "Unknown or missing action"

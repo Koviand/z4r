@@ -161,11 +161,10 @@ if [ -d "$SCRIPT_DIR/www" ] && [ -f "$SCRIPT_DIR/www/index.html" ]; then
   cp -r "$SCRIPT_DIR/www"/* /opt/zapret/www/
 else
   curl -sL -o /opt/zapret/www/index.html "$Z4R_RAW_URL/www/index.html"
-  curl -sL -o /opt/zapret/www/handler.sh "$Z4R_RAW_URL/www/handler.sh"
   curl -sL -o /opt/zapret/www/cgi-bin/status.sh "$Z4R_RAW_URL/www/cgi-bin/status.sh"
   curl -sL -o /opt/zapret/www/cgi-bin/action.sh "$Z4R_RAW_URL/www/cgi-bin/action.sh"
 fi
-chmod +x /opt/zapret/www/cgi-bin/*.sh /opt/zapret/www/handler.sh 2>/dev/null || true
+chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
 
 }
 
@@ -389,11 +388,10 @@ install_web_ui() {
    cp -r "$SCRIPT_DIR/www"/* /opt/zapret/www/
   else
    curl -sL -o /opt/zapret/www/index.html "$Z4R_RAW_URL/www/index.html"
-   curl -sL -o /opt/zapret/www/handler.sh "$Z4R_RAW_URL/www/handler.sh"
    curl -sL -o /opt/zapret/www/cgi-bin/status.sh "$Z4R_RAW_URL/www/cgi-bin/status.sh"
    curl -sL -o /opt/zapret/www/cgi-bin/action.sh "$Z4R_RAW_URL/www/cgi-bin/action.sh"
   fi
-  chmod +x /opt/zapret/www/cgi-bin/*.sh /opt/zapret/www/handler.sh 2>/dev/null || true
+  chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
  fi
 
  # Проверка наличия апплета httpd в busybox (--list или httpd --help без "applet not found")
@@ -412,7 +410,7 @@ install_web_ui() {
   HTTPD_CMD=""
   for cmd in busybox /usr/bin/busybox /opt/bin/busybox; do
    if _busybox_has_httpd "$cmd"; then
-    HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www"
+    HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
     break
    fi
   done
@@ -426,7 +424,7 @@ Description=z4r Web Panel
 After=network.target
 
 [Service]
-ExecStart=/bin/sh -c 'B=$(command -v busybox 2>/dev/null || command -v /usr/bin/busybox 2>/dev/null || command -v /opt/bin/busybox 2>/dev/null); exec $B httpd -p 17681 -h /opt/zapret/www'
+ExecStart=/bin/sh -c 'B=$(command -v busybox 2>/dev/null || command -v /usr/bin/busybox 2>/dev/null || command -v /opt/bin/busybox 2>/dev/null); exec $B httpd -p 17681 -h /opt/zapret/www -c /cgi-bin'
 Restart=always
 RestartSec=5
 
@@ -454,32 +452,27 @@ SVC
 
  elif [[ "$OSystem" == "entware" ]]; then
   echo -e "${yellow}Настройка веб-панели для Entware${plain}"
-  HTTPD_CMD=""
-  for cmd in /opt/bin/busybox /usr/bin/busybox busybox; do
-   if _busybox_has_httpd "$cmd"; then
-    HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www"
-    break
-   fi
-  done
-  USE_NC_FALLBACK=""
-  if [ -z "$HTTPD_CMD" ]; then
-   # Fallback: nc -e handler (one connection per nc invocation)
-   if command -v nc >/dev/null 2>&1 && nc -h 2>&1 | grep -q '\-e'; then
-    if [ ! -x /opt/zapret/www/handler.sh ]; then
-     Z4R_RAW_URL="${Z4R_RAW_URL:-$Z4R_REPO_RAW}"
-     [ -d "$SCRIPT_DIR/www" ] && [ -f "$SCRIPT_DIR/www/handler.sh" ] && cp "$SCRIPT_DIR/www/handler.sh" /opt/zapret/www/handler.sh
-     [ ! -f /opt/zapret/www/handler.sh ] && curl -sL -o /opt/zapret/www/handler.sh "$Z4R_RAW_URL/www/handler.sh"
-     chmod +x /opt/zapret/www/handler.sh 2>/dev/null || true
+  if command -v uci >/dev/null 2>&1; then
+   uci add uhttpd uhttpd 2>/dev/null || true
+   uci set uhttpd.@uhttpd[-1].listen_http='17681'
+   uci set uhttpd.@uhttpd[-1].home='/opt/zapret/www'
+   uci set uhttpd.@uhttpd[-1].cgi_prefix='/cgi-bin'
+   uci commit uhttpd 2>/dev/null || true
+   /etc/init.d/uhttpd restart 2>/dev/null || true
+   echo -e "${green}Веб-панель (uhttpd): http://IP:17681${plain}"
+  else
+   HTTPD_CMD=""
+   for cmd in /opt/bin/busybox /usr/bin/busybox busybox; do
+    if _busybox_has_httpd "$cmd"; then
+     HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
+     break
     fi
-    [ -x /opt/zapret/www/handler.sh ] && USE_NC_FALLBACK="1"
-   fi
-   if [ -z "$USE_NC_FALLBACK" ]; then
-    echo -e "${yellow}У busybox нет апплета httpd и нет nc с -e. Установите busybox с httpd или nc. Либо включите веб-панель через uhttpd на OpenWrt.${plain}"
+   done
+   if [ -z "$HTTPD_CMD" ]; then
+    echo -e "${yellow}Установите uhttpd (opkg install uhttpd) или busybox с апплетом httpd.${plain}"
     return 0
    fi
-  fi
-  if [ -n "$HTTPD_CMD" ]; then
-  cat > /opt/etc/init.d/S99z4r-web <<'INIT'
+   cat > /opt/etc/init.d/S99z4r-web <<'INIT'
 #!/bin/sh
 START=99
 _has_httpd() {
@@ -493,7 +486,7 @@ _has_httpd() {
 case "$1" in
   start)
     for b in /opt/bin/busybox /usr/bin/busybox busybox; do
-      [ -x "$b" ] 2>/dev/null && _has_httpd "$b" && $b httpd -p 17681 -h /opt/zapret/www & break
+      [ -x "$b" ] 2>/dev/null && _has_httpd "$b" && $b httpd -p 17681 -h /opt/zapret/www -c /cgi-bin & break
     done
     ;;
   stop)
@@ -503,25 +496,10 @@ case "$1" in
   *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
 esac
 INIT
-  else
-  cat > /opt/etc/init.d/S99z4r-web <<'INIT'
-#!/bin/sh
-START=99
-case "$1" in
-  start)
-    while true; do nc -l -p 17681 -e /opt/zapret/www/handler.sh; done &
-    ;;
-  stop)
-    pkill -f "nc -l -p 17681" 2>/dev/null || pkill -f "handler.sh" 2>/dev/null || true
-    ;;
-  restart) $0 stop; sleep 1; $0 start ;;
-  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
-esac
-INIT
-  fi
-  chmod +x /opt/etc/init.d/S99z4r-web
-  /opt/etc/init.d/S99z4r-web start
-  echo -e "${green}Веб-панель: http://IP:17681${plain}"
+   chmod +x /opt/etc/init.d/S99z4r-web
+   /opt/etc/init.d/S99z4r-web start
+   echo -e "${green}Веб-панель: http://IP:17681${plain}"
+   fi
  fi
 
  echo -e "${plain}Доступ: ${green}http://<IP_роутера_или_VPS>:17681${plain}"

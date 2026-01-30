@@ -114,10 +114,9 @@ for file in $LIB_FILES; do
 done
 mkdir -p "${INSTALL_DIR}/zapret/www" "${INSTALL_DIR}/zapret/www/cgi-bin"
 $DL_CMD "${INSTALL_DIR}/zapret/www/index.html" "$RAW_URL/www/index.html" 2>/dev/null
-$DL_CMD "${INSTALL_DIR}/zapret/www/handler.sh" "$RAW_URL/www/handler.sh" 2>/dev/null
 $DL_CMD "${INSTALL_DIR}/zapret/www/cgi-bin/status.sh" "$RAW_URL/www/cgi-bin/status.sh" 2>/dev/null
 $DL_CMD "${INSTALL_DIR}/zapret/www/cgi-bin/action.sh" "$RAW_URL/www/cgi-bin/action.sh" 2>/dev/null
-chmod +x "${INSTALL_DIR}/zapret/www/cgi-bin/"*.sh "${INSTALL_DIR}/zapret/www/handler.sh" 2>/dev/null || true
+chmod +x "${INSTALL_DIR}/zapret/www/cgi-bin/"*.sh 2>/dev/null || true
 wait
 
 echo "✓ Компоненты загружены"

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="15">
   <title>z4r — панель</title>
   <style>
     * { box-sizing: border-box; }
@@ -33,6 +34,16 @@
         <button class="btn success" id="btnStart">Старт</button>
         <button class="btn danger" id="btnStop">Стоп</button>
         <button class="btn" id="btnRestart">Перезапуск</button>
+        <span style="margin-left:0.5rem">или без JS:</span>
+        <form action="cgi-bin/action.sh" method="get" style="display:inline">
+          <input type="hidden" name="action" value="start"><button type="submit" class="btn success">Старт</button>
+        </form>
+        <form action="cgi-bin/action.sh" method="get" style="display:inline">
+          <input type="hidden" name="action" value="stop"><button type="submit" class="btn danger">Стоп</button>
+        </form>
+        <form action="cgi-bin/action.sh" method="get" style="display:inline">
+          <input type="hidden" name="action" value="restart"><button type="submit" class="btn">Перезапуск</button>
+        </form>
       </span>
     </div>
     <div class="row strat">
@@ -62,6 +73,7 @@
       <button class="btn" id="btnFlowoffload">Применить</button>
     </div>
     <div class="meta" id="meta">Обновление…</div>
+    <p><a href="cgi-bin/status.sh?format=html">Только статус (HTML, без JS)</a></p>
   </div>
 
   <script>
@@ -101,8 +113,12 @@
     function doAction(params) {
       var q = Object.keys(params).map(function(k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
       fetch(api('cgi-bin/action.sh?' + q))
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (r.redirected) { loadStatus(); return; }
+          return r.json();
+        })
         .then(function(d) {
+          if (!d) return;
           if (d.ok) setTimeout(loadStatus, 800);
           else document.getElementById('meta').textContent = d.error || 'Ошибка';
         })
