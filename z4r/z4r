@@ -1,10 +1,10 @@
 #!/bin/sh
 
 BRANCH="4"
-RAW_URL="https://raw.githubusercontent.com/Koviand/z4r/${BRANCH}/zapret4rocket"
-API_URL="https://api.github.com/repos/Koviand/z4r/contents/zapret4rocket/lib?ref=${BRANCH}"
+RAW_URL="https://raw.githubusercontent.com/Koviand/z4r_web/${BRANCH}/zapret4rocket"
+API_URL="https://api.github.com/repos/Koviand/z4r_web/contents/zapret4rocket/lib?ref=${BRANCH}"
 INSTALL_DIR="/opt"
-INSTALLER_URL="https://raw.githubusercontent.com/Koviand/z4r/${BRANCH}/z4r/z4r"
+INSTALLER_URL="https://raw.githubusercontent.com/Koviand/z4r_web/${BRANCH}/z4r/z4r"
 LIB_FILES_FALLBACK="ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh"
 
 # Определение пути для команды z4r

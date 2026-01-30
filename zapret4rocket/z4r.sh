@@ -367,7 +367,7 @@ get_panel() {
 }
 
 # Веб-панель z4r (без терминала)
-WEB_RAW_BASE="${WEB_RAW_BASE:-https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master}"
+WEB_RAW_BASE="${WEB_RAW_BASE:-https://raw.githubusercontent.com/Koviand/z4r_web/main}"
 
 deploy_web_files() {
  mkdir -p /opt/zapret/web/scripts
