@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>z4r — панель</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 1rem; background: #1a1a1a; color: #e0e0e0; }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    .card { background: #2a2a2a; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .status { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; }
+    .status.on { background: #0a4; color: #000; }
+    .status.off { background: #c44; color: #fff; }
+    .status.err { background: #666; color: #ccc; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .strat { margin-right: 1rem; }
+    .btn { padding: 0.4rem 0.8rem; border: none; border-radius: 4px; cursor: pointer; background: #444; color: #eee; }
+    .btn:hover { background: #555; }
+    .btn.danger { background: #733; }
+    .btn.success { background: #363; }
+    select { padding: 0.3rem; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; }
+    .meta { font-size: 0.85rem; color: #888; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>z4r — веб-панель</h1>
+  <div class="card">
+    <div class="row">
+      <span>Zapret:</span>
+      <span id="running" class="status err">—</span>
+      <span style="margin-left:1rem">
+        <button class="btn success" id="btnStart">Старт</button>
+        <button class="btn danger" id="btnStop">Стоп</button>
+        <button class="btn" id="btnRestart">Перезапуск</button>
+      </span>
+    </div>
+    <div class="row strat">
+      <span class="strat">YT_UDP: <b id="yt_udp">—</b></span>
+      <span class="strat">YT_TCP: <b id="yt_tcp">—</b></span>
+      <span class="strat">YT_GV: <b id="yt_gv">—</b></span>
+      <span class="strat">RKN: <b id="rkn">—</b></span>
+    </div>
+    <div class="row">
+      <label>FWTYPE:</label>
+      <select id="fwtype">
+        <option value="">—</option>
+        <option value="iptables">iptables</option>
+        <option value="nftables">nftables</option>
+      </select>
+      <button class="btn" id="btnFwtype">Применить</button>
+    </div>
+    <div class="row">
+      <label>FLOWOFFLOAD:</label>
+      <select id="flowoffload">
+        <option value="">—</option>
+        <option value="software">software</option>
+        <option value="hardware">hardware</option>
+        <option value="none">none</option>
+        <option value="donttouch">donttouch</option>
+      </select>
+      <button class="btn" id="btnFlowoffload">Применить</button>
+    </div>
+    <div class="meta" id="meta">Обновление…</div>
+  </div>
+
+  <script>
+    var base = '';
+    function api(path) { return base + path; }
+    function setRunning(on) {
+      var el = document.getElementById('running');
+      el.textContent = on ? 'Запущен' : 'Остановлен';
+      el.className = 'status ' + (on ? 'on' : 'off');
+    }
+    function setStrategies(s) {
+      if (!s) return;
+      document.getElementById('yt_udp').textContent = s.yt_udp === 0 ? 'Def' : s.yt_udp;
+      document.getElementById('yt_tcp').textContent = s.yt_tcp === 0 ? 'Def' : s.yt_tcp;
+      document.getElementById('yt_gv').textContent = s.yt_gv === 0 ? 'Def' : s.yt_gv;
+      document.getElementById('rkn').textContent = s.rkn === 0 ? 'Def' : s.rkn;
+    }
+    function setMeta(fw, fl) {
+      document.getElementById('fwtype').value = fw || '';
+      document.getElementById('flowoffload').value = fl || '';
+    }
+    function loadStatus() {
+      fetch(api('cgi-bin/status.sh'))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          setRunning(d.running);
+          setStrategies(d.strategies);
+          setMeta(d.fwtype, d.flowoffload);
+          document.getElementById('meta').textContent = 'Обновлено ' + new Date().toLocaleTimeString();
+        })
+        .catch(function() {
+          document.getElementById('running').textContent = 'Ошибка';
+          document.getElementById('running').className = 'status err';
+          document.getElementById('meta').textContent = 'Ошибка запроса';
+        });
+    }
+    function doAction(params) {
+      var q = Object.keys(params).map(function(k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+      fetch(api('cgi-bin/action.sh?' + q))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) setTimeout(loadStatus, 800);
+          else document.getElementById('meta').textContent = d.error || 'Ошибка';
+        })
+        .catch(function() { document.getElementById('meta').textContent = 'Ошибка запроса'; });
+    }
+    document.getElementById('btnStart').onclick = function() { doAction({ action: 'start' }); };
+    document.getElementById('btnStop').onclick = function() { doAction({ action: 'stop' }); };
+    document.getElementById('btnRestart').onclick = function() { doAction({ action: 'restart' }); };
+    document.getElementById('btnFwtype').onclick = function() {
+      var v = document.getElementById('fwtype').value;
+      if (v) doAction({ fwtype: v });
+    };
+    document.getElementById('btnFlowoffload').onclick = function() {
+      var v = document.getElementById('flowoffload').value;
+      if (v) doAction({ flowoffload: v });
+    };
+    loadStatus();
+    setInterval(loadStatus, 15000);
+  </script>
+</body>
+</html>

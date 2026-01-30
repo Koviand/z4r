@@ -5,6 +5,10 @@ set -e
 #Переменная содержащая версию на случай невозможности получить информацию о lastest с github
 DEFAULT_VER="72.6"
 
+# Репозиторий для загрузки zapret4rocket (raw и API)
+Z4R_REPO_RAW="https://raw.githubusercontent.com/Koviand/z4r_web/4/zapret4rocket"
+Z4R_REPO_API="https://api.github.com/repos/Koviand/z4r_web/contents/zapret4rocket"
+
 #Чтобы удобнее красить текст
 plain='\033[0m'
 red='\033[0;31m'
@@ -32,12 +36,6 @@ Bcyan='\033[46m'
 
 #Определяем путь скрипта, подгружаем функции
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-
-# Репозиторий для загрузки zapret4rocket (lists, config, web и т.д.)
-REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/Koviand/z4r_web/4/zapret4rocket}"
-REPO_API="${REPO_API:-Koviand/z4r_web}"
-BRANCH_REPO="${BRANCH_REPO:-4}"
-export REPO_RAW REPO_API BRANCH_REPO
 
 # Неинтерактивный режим: -y / --yes / --non-interactive
 Z4R_NONINTERACTIVE=0
@@ -128,11 +126,11 @@ change_user() {
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
 get_repo() {
  mkdir -p /opt/zapret/lists /opt/zapret/extra_strats/TCP/{RKN,User,YT,temp,GV} /opt/zapret/extra_strats/UDP/YT
- for listfile in netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do curl -L -o /opt/zapret/lists/$listfile "$REPO_RAW/lists/$listfile"; done
- curl -L "$REPO_RAW/fake_files.tar.gz" 2>/dev/null | tar -xz -C /opt/zapret/files/fake 2>/dev/null || curl -L "https://github.com/${REPO_API}/raw/${BRANCH_REPO}/zapret4rocket/fake_files.tar.gz" | tar -xz -C /opt/zapret/files/fake
- curl -L -o /opt/zapret/extra_strats/UDP/YT/List.txt "$REPO_RAW/extra_strats/UDP/YT/List.txt"
- curl -L -o /opt/zapret/extra_strats/TCP/RKN/List.txt "$REPO_RAW/extra_strats/TCP/RKN/List.txt"
- curl -L -o /opt/zapret/extra_strats/TCP/YT/List.txt "$REPO_RAW/extra_strats/TCP/YT/List.txt"
+ for listfile in netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do curl -L -o /opt/zapret/lists/$listfile "$Z4R_REPO_RAW/lists/$listfile"; done
+ curl -L "$Z4R_REPO_RAW/fake_files.tar.gz" | tar -xz -C /opt/zapret/files/fake
+ curl -L -o /opt/zapret/extra_strats/UDP/YT/List.txt "$Z4R_REPO_RAW/extra_strats/UDP/YT/List.txt"
+ curl -L -o /opt/zapret/extra_strats/TCP/RKN/List.txt "$Z4R_REPO_RAW/extra_strats/TCP/RKN/List.txt"
+ curl -L -o /opt/zapret/extra_strats/TCP/YT/List.txt "$Z4R_REPO_RAW/extra_strats/TCP/YT/List.txt"
  touch /opt/zapret/lists/autohostlist.txt /opt/zapret/extra_strats/UDP/YT/{1..8}.txt /opt/zapret/extra_strats/TCP/RKN/{1..17}.txt /opt/zapret/extra_strats/TCP/User/{1..17}.txt /opt/zapret/extra_strats/TCP/YT/{1..17}.txt /opt/zapret/extra_strats/TCP/GV/{1..17}.txt /opt/zapret/extra_strats/TCP/temp/{1..17}.txt
  if [ -d /opt/extra_strats ]; then
   rm -rf /opt/zapret/extra_strats
@@ -144,7 +142,7 @@ get_repo() {
    echo "Востановление листа исключений выполнено."
  fi
  #Копирование нашего конфига на замену стандартному и скриптов для войсов DS, WA, TG
- curl -L -o /opt/zapret/config.default "$REPO_RAW/config.default"
+ curl -L -o /opt/zapret/config.default "$Z4R_REPO_RAW/config.default"
  if command -v nft >/dev/null 2>&1; then
   sed -i 's/^FWTYPE=iptables$/FWTYPE=nftables/' "/opt/zapret/config.default"
  fi
@@ -156,16 +154,17 @@ get_repo() {
 # cache
 mkdir -p /opt/zapret/extra_strats/cache
 
-# веб-панель (дашборд + api)
-mkdir -p /opt/zapret/web
-if [ -d "$SCRIPT_DIR/web" ]; then
-  cp -r "$SCRIPT_DIR/web"/* /opt/zapret/web/
+# Веб-панель: доставка www (локальная копия или скачивание)
+mkdir -p /opt/zapret/www /opt/zapret/www/cgi-bin
+Z4R_RAW_URL="$Z4R_REPO_RAW"
+if [ -d "$SCRIPT_DIR/www" ] && [ -f "$SCRIPT_DIR/www/index.html" ]; then
+  cp -r "$SCRIPT_DIR/www"/* /opt/zapret/www/
 else
-  for f in index.html api.sh server.py; do
-    curl -L -o "/opt/zapret/web/$f" "$REPO_RAW/web/$f" 2>/dev/null || true
-  done
+  curl -sL -o /opt/zapret/www/index.html "$Z4R_RAW_URL/www/index.html"
+  curl -sL -o /opt/zapret/www/cgi-bin/status.sh "$Z4R_RAW_URL/www/cgi-bin/status.sh"
+  curl -sL -o /opt/zapret/www/cgi-bin/action.sh "$Z4R_RAW_URL/www/cgi-bin/action.sh"
 fi
-chmod +x /opt/zapret/web/api.sh 2>/dev/null || true
+chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
 
 }
 
@@ -311,13 +310,13 @@ install_zapret_reboot() {
 #Для Entware Keenetic + merlin
 entware_fixes() {
  if [ "$hardware" = "keenetic" ]; then
-  curl -L -o /opt/zapret/init.d/sysv/zapret "$REPO_RAW/Entware/zapret"
+  curl -L -o /opt/zapret/init.d/sysv/zapret "$Z4R_REPO_RAW/Entware/zapret"
   chmod +x /opt/zapret/init.d/sysv/zapret
   echo "Права выданы /opt/zapret/init.d/sysv/zapret"
-  curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh "$REPO_RAW/Entware/000-zapret.sh"
+  curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh "$Z4R_REPO_RAW/Entware/000-zapret.sh"
   chmod +x /opt/etc/ndm/netfilter.d/000-zapret.sh
   echo "Права выданы /opt/etc/ndm/netfilter.d/000-zapret.sh"
-  curl -L -o /opt/etc/init.d/S00fix "$REPO_RAW/Entware/S00fix"
+  curl -L -o /opt/etc/init.d/S00fix "$Z4R_REPO_RAW/Entware/S00fix"
   chmod +x /opt/etc/init.d/S00fix
   echo "Права выданы /opt/etc/init.d/S00fix"
   cp -a /opt/zapret/init.d/custom.d.examples.linux/10-keenetic-udp-fix /opt/zapret/init.d/sysv/custom.d/10-keenetic-udp-fix
@@ -370,8 +369,8 @@ get_panel() {
      echo "Установка 3proxy (by SnoyIatk). Доустановка с apt build-essential для сборки (debian/ubuntu)"
 	 apt update && apt install build-essential
      bash <(curl -Ls https://raw.githubusercontent.com/SnoyIatk/3proxy/master/3proxyinstall.sh)
-     curl -L -o /etc/3proxy/.proxyauth "$REPO_RAW/docs/del.proxyauth"
-     curl -L -o /etc/3proxy/3proxy.cfg "$REPO_RAW/docs/3proxy.cfg"
+    curl -L -o /etc/3proxy/.proxyauth "$Z4R_REPO_RAW/docs/del.proxyauth"
+    curl -L -o /etc/3proxy/3proxy.cfg "$Z4R_REPO_RAW/docs/3proxy.cfg"
  elif [[ "$clean_answer" == "MARZBAN" ]]; then
      echo "Установка Marzban"
      bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
@@ -380,149 +379,102 @@ get_panel() {
  fi
 }
 
-# веб-дашборд (интерактивная панель на порту 17682)
-z4r_web_dashboard() {
- if ! command -v python3 >/dev/null 2>&1; then
-  echo -e "${yellow}python3 не найден — веб-дашборд не устанавливается. Терминал (ttyd) будет на порту 17681.${plain}"
-  return
+# Веб-панель: развернуть www (если ещё нет) и запустить сервер на порту 17681
+install_web_ui() {
+ if [ ! -f /opt/zapret/www/index.html ]; then
+  mkdir -p /opt/zapret/www /opt/zapret/www/cgi-bin
+  Z4R_RAW_URL="${Z4R_RAW_URL:-$Z4R_REPO_RAW}"
+  if [ -d "$SCRIPT_DIR/www" ] && [ -f "$SCRIPT_DIR/www/index.html" ]; then
+   cp -r "$SCRIPT_DIR/www"/* /opt/zapret/www/
+  else
+   curl -sL -o /opt/zapret/www/index.html "$Z4R_RAW_URL/www/index.html"
+   curl -sL -o /opt/zapret/www/cgi-bin/status.sh "$Z4R_RAW_URL/www/cgi-bin/status.sh"
+   curl -sL -o /opt/zapret/www/cgi-bin/action.sh "$Z4R_RAW_URL/www/cgi-bin/action.sh"
+  fi
+  chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
  fi
- if [ ! -f /opt/zapret/web/server.py ]; then
-  echo -e "${yellow}Файлы веб-панели не найдены в /opt/zapret/web. Выполните обновление (Enter в меню).${plain}"
-  return
- fi
+
  if [[ "$OSystem" == "VPS" ]]; then
+  echo -e "${yellow}Настройка веб-панели для VPS${plain}"
   systemctl stop z4r-web 2>/dev/null || true
-  cat > /etc/systemd/system/z4r-web.service <<'Z4RWEB'
+  HTTPD_CMD=""
+  for cmd in busybox /usr/bin/busybox /opt/bin/busybox; do
+   if command -v "$cmd" >/dev/null 2>&1 && $cmd httpd --help 2>&1 | grep -q '\-p'; then
+    HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
+    break
+   fi
+  done
+  if [ -z "$HTTPD_CMD" ]; then
+   echo -e "${yellow}busybox httpd не найден. Установите busybox-static или настройте nginx/apache с CGI для /opt/zapret/www.${plain}"
+   return 0
+  fi
+  cat > /etc/systemd/system/z4r-web.service <<'SVC'
 [Unit]
-Description=zeefeer Web Dashboard
+Description=z4r Web Panel
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/zapret/web/server.py 17682
+ExecStart=/bin/sh -c 'B=$(command -v busybox 2>/dev/null || command -v /usr/bin/busybox 2>/dev/null || command -v /opt/bin/busybox 2>/dev/null); exec $B httpd -p 17681 -h /opt/zapret/www -c /cgi-bin'
 Restart=always
 RestartSec=5
-Environment=ZAPRET_DIR=/opt/zapret
 
 [Install]
 WantedBy=multi-user.target
-Z4RWEB
+SVC
   systemctl daemon-reload
   systemctl enable z4r-web
   systemctl start z4r-web
-  echo -e "${green}Веб-дашборд: порт 17682 (панель управления). Терминал: порт 17681 (ttyd).${plain}"
- elif [[ "$OSystem" == "entware" ]]; then
-  /opt/etc/init.d/S98z4r-web stop 2>/dev/null || true
-  cat > /opt/etc/init.d/S98z4r-web <<'Z4RWEB'
-#!/bin/sh
-START=98
-case "$1" in
-  start)   echo "Starting z4r-web..."; ZAPRET_DIR=/opt/zapret python3 /opt/zapret/web/server.py 17682 & ;;
-  stop)    pkill -f "server.py 17682" 2>/dev/null || true ;;
-  restart) $0 stop; sleep 1; $0 start ;;
-  *)       echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
-esac
-Z4RWEB
-  chmod +x /opt/etc/init.d/S98z4r-web
-  /opt/etc/init.d/S98z4r-web start
-  echo -e "${green}Веб-дашборд: порт 17682. Терминал: порт 17681.${plain}"
+  echo -e "${green}Веб-панель: http://IP:17681${plain}"
+
  elif [[ "$OSystem" == "WRT" ]]; then
-  ( ZAPRET_DIR=/opt/zapret python3 /opt/zapret/web/server.py 17682 & )
-  echo -e "${green}Веб-дашборд запущен на порту 17682 (до перезагрузки). Терминал: 17681.${plain}"
- fi
-}
+  echo -e "${yellow}Настройка веб-панели для OpenWrt (uhttpd)${plain}"
+  if ! command -v uci >/dev/null 2>&1; then
+   echo -e "${yellow}uhttpd/uci не найдены. Установите uhttpd и настройте вручную.${plain}"
+   return 0
+  fi
+  uci add uhttpd uhttpd 2>/dev/null || true
+  uci set uhttpd.@uhttpd[-1].listen_http='17681'
+  uci set uhttpd.@uhttpd[-1].home='/opt/zapret/www'
+  uci set uhttpd.@uhttpd[-1].cgi_prefix='/cgi-bin'
+  uci commit uhttpd 2>/dev/null || true
+  /etc/init.d/uhttpd restart 2>/dev/null || true
+  echo -e "${green}Веб-панель: http://IP:17681${plain}"
 
-#webssh ttyd
-ttyd_webssh() {
- echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z4r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
- read -re -p '' ttyd_login
- echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
- 
- ttyd_login_have="-c "${ttyd_login}": bash z4r"
- if [[ "$ttyd_login" == "0" ]]; then
-	echo "Отключение логина в веб. Перевод с z4r на CLI логин."
-    ttyd_login_have="login"
- fi
- 
- if [[ "$OSystem" == "VPS" ]]; then
-	echo -e "${yellow}Установка ttyd for VPS${plain}"
-	systemctl stop ttyd 2>/dev/null || true
-	curl -L -o /usr/bin/ttyd https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64
-	chmod +x /usr/bin/ttyd
-	
-	cat > /etc/systemd/system/ttyd.service <<EOF
-[Unit]
-Description=ttyd WebSSH Service
-After=network.target
-
-[Service]
-ExecStart=/usr/bin/ttyd -p 17681 -W -a ${ttyd_login_have}
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-	systemctl daemon-reload
-	systemctl enable ttyd
-	systemctl start ttyd
- elif [[ "$OSystem" == "WRT" ]]; then
-	echo -e "${yellow}Установка ttyd for WRT${plain}"
-	/etc/init.d/ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-    uci set ttyd.@ttyd[0].interface=''
-    uci set ttyd.@ttyd[0].command="-p 17681 -W -a ${ttyd_login_have}"
-	uci commit ttyd
-	/etc/init.d/ttyd enable
-	/etc/init.d/ttyd start
  elif [[ "$OSystem" == "entware" ]]; then
-	echo -e "${yellow}Установка ttyd for Entware${plain}"
-	/opt/etc/init.d/S99ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-	
-	cat > /opt/etc/init.d/S99ttyd <<EOF
+  echo -e "${yellow}Настройка веб-панели для Entware${plain}"
+  HTTPD_CMD=""
+  for cmd in /opt/bin/busybox busybox; do
+   if command -v "$cmd" >/dev/null 2>&1 && $cmd httpd --help 2>&1 | grep -q '\-p'; then
+    HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
+    break
+   fi
+  done
+  if [ -z "$HTTPD_CMD" ]; then
+   echo -e "${yellow}busybox httpd не найден. opkg install busybox.${plain}"
+   return 0
+  fi
+  cat > /opt/etc/init.d/S99z4r-web <<'INIT'
 #!/bin/sh
-
 START=99
-
-case "\$1" in
+case "$1" in
   start)
-    echo "Starting ttyd..."
-    ttyd -p 17681 -W -a ${ttyd_login_have} &
+    for b in /opt/bin/busybox busybox; do
+      [ -x "$b" ] && $b httpd -p 17681 -h /opt/zapret/www -c /cgi-bin & break
+    done
     ;;
   stop)
-    echo "Stopping ttyd..."
-    killall ttyd
+    pkill -f "httpd -p 17681" 2>/dev/null || killall httpd 2>/dev/null || true
     ;;
-  restart)
-    \$0 stop
-    sleep 1
-    \$0 start
-    ;;
-  *)
-    echo "Usage: \$0 {start|stop|restart}"
-    exit 1
-    ;;
+  restart) $0 stop; sleep 1; $0 start ;;
+  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
 esac
-EOF
-
-  chmod +x /opt/etc/init.d/S99ttyd
-  /opt/etc/init.d/S99ttyd start
-  sleep 1
-  if netstat -tuln | grep -q ':17681'; then
-	echo -e "${green}Порт 17681 для службы ttyd слушается${plain}"
-  else
-	echo -e "${red}Порт 17681 для службы ttyd не прослушивается${plain}"
-  fi
+INIT
+  chmod +x /opt/etc/init.d/S99z4r-web
+  /opt/etc/init.d/S99z4r-web start
+  echo -e "${green}Веб-панель: http://IP:17681${plain}"
  fi
 
- if pidof ttyd >/dev/null; then
-	echo -e "Проверка...${green}Служба ttyd запущена.${plain}"
- else
-	echo -e "Проверка...${red}Служба ttyd не запущена! Если у вас Entware, то после перезагрузки роутера служба скорее всего заработает!${plain}"
- fi
- z4r_web_dashboard
- echo -e "${plain}Выполнение установки завершено. ${green}Панель управления: ip:17682. Терминал (ttyd): ip:17681. Пример: 192.168.1.1:17682 или mydomain.com:17681 ${yellow}логин ttyd: ${ttyd_login} (пароль не используется).${plain} Выход из скрипта для сохранения состояния."
+ echo -e "${plain}Доступ: ${green}http://<IP_роутера_или_VPS>:17681${plain}"
 }
 
 #Меню, проверка состояний и вывод с чтением ответа
@@ -565,7 +517,7 @@ Enter (без цифр) - переустановка/обновление zapret
 10. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
 11. Управление аппаратным ускорением zapret. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret/config)"']'"${yellow}"'
 12. Меню (Де)Активации работы по всем доменам TCP-443 без хост-листов (не затрагивает youtube стратегии) (безразборный режим) Сейчас: '"${plain}"'['"$(num=$(sed -n '112,128p' /opt/zapret/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1); [ -n "$num" ] && echo "$num" || echo "Отключен")"']'"${yellow}"'
-13. Активировать веб-панель и терминал в браузере (панель: :17682, ttyd: :17681, ~3 МБ)
+13. Включить веб-панель (порт 17681)
 14. Провайдер
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, Nomand, Kovi, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -684,7 +636,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "13")
-    ttyd_webssh
+    install_web_ui
     pause_enter
     ;;
 
@@ -782,7 +734,7 @@ esac
 fi
 
 #Инфа о времени обновления скрпта
-commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/${REPO_API}/commits?path=zapret4rocket/z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
+commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/Koviand/z4r_web/commits?path=zapret4rocket/z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
 if [[ -z "$commit_date" ]]; then
     echo -e "${red}Не был получен доступ к api.github.com (таймаут 30 сек). Возможны проблемы при установке.${plain}"
 	if [ "$hardware" = "keenetic" ]; then
@@ -793,7 +745,7 @@ if [[ -z "$commit_date" ]]; then
 		else
 			echo $IP_ghub
 			ndmc -c "ip host api.github.com $IP_ghub"
-			echo -e "${yellow}zeefeer обновлен (UTC +0): $(curl -s --max-time 10 "https://api.github.com/repos/${REPO_API}/commits?path=zapret4rocket/z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+			echo -e "${yellow}zeefeer обновлен (UTC +0): $(curl -s --max-time 10 "https://api.github.com/repos/Koviand/z4r_web/commits?path=zapret4rocket/z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
 		fi
 	fi
 else
@@ -852,24 +804,9 @@ backup_strats
 remove_zapret
 
 #Запрос желаемой версии zapret
-echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/${REPO_API}/commits?path=zapret4rocket/config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/Koviand/z4r_web/commits?path=zapret4rocket/config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
 version_select
 
-#Запрос на установку web-ssh
-if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
-	ttyd_answer=""
-else
-	read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
-fi
-case "$ttyd_answer" in
-	"1")
-		ttyd_webssh
-	;;
-	*)
-		echo "Пропуск (пере)установки web-терминала"
-	;;
-esac 
- 
 #Скачивание, распаковка архива zapret и его удаление
 zapret_get
 
@@ -888,3 +825,18 @@ fi
 
 #Запуск установочных скриптов и перезагрузка
 install_zapret_reboot
+
+#Запрос на установку веб-панели (после get_repo, чтобы www уже в /opt/zapret)
+if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+	web_ui_answer=""
+else
+	read -re -p $'\033[33mВключить веб-панель (порт 17681)? 1 - Да, Enter - нет\033[0m\n' web_ui_answer
+fi
+case "$web_ui_answer" in
+	"1")
+		install_web_ui
+	;;
+	*)
+		echo "Пропуск установки веб-панели"
+	;;
+esac
