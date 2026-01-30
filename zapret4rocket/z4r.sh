@@ -150,6 +150,9 @@ get_repo() {
 # cache
 mkdir -p /opt/zapret/extra_strats/cache
 
+# Файлы веб-панели (для обновления и первой установки)
+deploy_web_files
+
 }
 
 #Удаление старого запрета, если есть
@@ -363,68 +366,86 @@ get_panel() {
  fi
 }
 
-#webssh ttyd
-ttyd_webssh() {
- echo -e $'\033[33mВведите логин для доступа к zeefeer через браузер (0 - отказ от логина через web в z4r и переход на логин в ssh (может помочь в safari). Enter - пустой логин, \033[31mно не рекомендуется, панель может быть доступна из интернета!)\033[0m'
- read -re -p '' ttyd_login
- echo -e "${yellow}Если вы открыли пункт через браузер - вас выкинет. Используйте SSH для установки${plain}"
- 
- ttyd_login_have="-c "${ttyd_login}": bash z4r"
- if [[ "$ttyd_login" == "0" ]]; then
-	echo "Отключение логина в веб. Перевод с z4r на CLI логин."
-    ttyd_login_have="login"
+# Веб-панель z4r (без терминала)
+WEB_RAW_BASE="${WEB_RAW_BASE:-https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master}"
+
+deploy_web_files() {
+ mkdir -p /opt/zapret/web/scripts
+ for f in index.html server.py; do
+  curl -sL -o "/opt/zapret/web/$f" "${WEB_RAW_BASE}/web/$f" 2>/dev/null || true
+ done
+ for f in status.sh actions.sh; do
+  curl -sL -o "/opt/zapret/web/scripts/$f" "${WEB_RAW_BASE}/web/scripts/$f" 2>/dev/null || true
+ done
+ chmod +x /opt/zapret/web/server.py /opt/zapret/web/scripts/status.sh /opt/zapret/web/scripts/actions.sh 2>/dev/null || true
+}
+
+install_web_panel() {
+ echo -e "${yellow}Если вы открыли пункт через браузер — вас выкинет. Используйте SSH для установки.${plain}"
+ deploy_web_files
+ if [ ! -f /opt/zapret/web/server.py ] || [ ! -f /opt/zapret/web/index.html ]; then
+  echo -e "${red}Не удалось загрузить файлы веб-панели. Проверьте доступ к интернету.${plain}"
+  pause_enter
+  return 1
  fi
- 
+ WEB_CONFIG="/opt/zapret/web/.config"
+ if [ -f "$WEB_CONFIG" ]; then
+  echo -e "${green}Найден существующий конфиг веб-панели. Обновление файлов и перезапуск службы.${plain}"
+ else
+  echo -e "${yellow}Привязать панель только к localhost (127.0.0.1)? 1 — да (рекомендуется), 2 — слушать все интерфейсы (0.0.0.0)${plain}"
+  read -re -p "Ваш выбор (Enter = 1): " bind_choice
+  case "${bind_choice:-1}" in
+   "2")
+    BIND="0.0.0.0"
+    echo -e "${yellow}Введите логин и пароль для HTTP Basic Auth (формат: логин:пароль), либо Enter — без авторизации (не рекомендуется).${plain}"
+    read -re -p "Логин:пароль: " auth_input
+    AUTH="${auth_input}"
+    ;;
+   *)
+    BIND="127.0.0.1"
+    AUTH=""
+    ;;
+  esac
+  echo "BIND=$BIND" > "$WEB_CONFIG"
+  echo "AUTH=$AUTH" >> "$WEB_CONFIG"
+ fi
+ PANEL_PORT="17681"
+ PYTHON3=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo "python3")
  if [[ "$OSystem" == "VPS" ]]; then
-	echo -e "${yellow}Установка ttyd for VPS${plain}"
-	systemctl stop ttyd 2>/dev/null || true
-	curl -L -o /usr/bin/ttyd https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64
-	chmod +x /usr/bin/ttyd
-	
-	cat > /etc/systemd/system/ttyd.service <<EOF
+  echo -e "${yellow}Установка веб-панели для VPS (systemd)${plain}"
+  systemctl stop z4r-web 2>/dev/null || true
+  cat > /etc/systemd/system/z4r-web.service <<EOF
 [Unit]
-Description=ttyd WebSSH Service
+Description=z4r Web Panel
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/ttyd -p 17681 -W -a ${ttyd_login_have}
+ExecStart=$PYTHON3 /opt/zapret/web/server.py --port $PANEL_PORT --config $WEB_CONFIG
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
-	systemctl daemon-reload
-	systemctl enable ttyd
-	systemctl start ttyd
+  systemctl daemon-reload
+  systemctl enable z4r-web
+  systemctl start z4r-web
  elif [[ "$OSystem" == "WRT" ]]; then
-	echo -e "${yellow}Установка ttyd for WRT${plain}"
-	/etc/init.d/ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-    uci set ttyd.@ttyd[0].interface=''
-    uci set ttyd.@ttyd[0].command="-p 17681 -W -a ${ttyd_login_have}"
-	uci commit ttyd
-	/etc/init.d/ttyd enable
-	/etc/init.d/ttyd start
- elif [[ "$OSystem" == "entware" ]]; then
-	echo -e "${yellow}Установка ttyd for Entware${plain}"
-	/opt/etc/init.d/S99ttyd stop 2>/dev/null || true
-	opkg install ttyd 2>/dev/null || apk add ttyd 2>/dev/null
-	
-	cat > /opt/etc/init.d/S99ttyd <<EOF
+  echo -e "${yellow}Установка веб-панели для WRT (init.d)${plain}"
+  /etc/init.d/z4r-web stop 2>/dev/null || true
+  cat > /etc/init.d/z4r-web <<INITD
 #!/bin/sh
 
 START=99
 
 case "\$1" in
   start)
-    echo "Starting ttyd..."
-    ttyd -p 17681 -W -a ${ttyd_login_have} &
+    echo "Starting z4r web panel..."
+    $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config &
     ;;
   stop)
-    echo "Stopping ttyd..."
-    killall ttyd
+    echo "Stopping z4r web panel..."
+    pkill -f "server.py --port 17681" 2>/dev/null || true
     ;;
   restart)
     \$0 stop
@@ -436,24 +457,58 @@ case "\$1" in
     exit 1
     ;;
 esac
-EOF
+INITD
+  chmod +x /etc/init.d/z4r-web
+  /etc/init.d/z4r-web enable
+  /etc/init.d/z4r-web start
+ elif [[ "$OSystem" == "entware" ]]; then
+  echo -e "${yellow}Установка веб-панели для Entware${plain}"
+  /opt/etc/init.d/S99z4r-web stop 2>/dev/null || true
+  cat > /opt/etc/init.d/S99z4r-web <<INITD
+#!/bin/sh
 
-  chmod +x /opt/etc/init.d/S99ttyd
-  /opt/etc/init.d/S99ttyd start
+START=99
+
+case "\$1" in
+  start)
+    echo "Starting z4r web panel..."
+    $PYTHON3 /opt/zapret/web/server.py --port 17681 --config /opt/zapret/web/.config &
+    ;;
+  stop)
+    echo "Stopping z4r web panel..."
+    pkill -f "server.py --port 17681" 2>/dev/null || true
+    ;;
+  restart)
+    \$0 stop
+    sleep 1
+    \$0 start
+    ;;
+  *)
+    echo "Usage: \$0 {start|stop|restart}"
+    exit 1
+    ;;
+esac
+INITD
+  chmod +x /opt/etc/init.d/S99z4r-web
+  /opt/etc/init.d/S99z4r-web start
   sleep 1
-  if netstat -tuln | grep -q ':17681'; then
-	echo -e "${green}Порт 17681 для службы ttyd слушается${plain}"
+  if command -v netstat >/dev/null 2>&1 && netstat -tuln | grep -q ':17681'; then
+   echo -e "${green}Порт 17681 для веб-панели слушается${plain}"
+  elif command -v ss >/dev/null 2>&1 && ss -tuln | grep -q ':17681'; then
+   echo -e "${green}Порт 17681 для веб-панели слушается${plain}"
   else
-	echo -e "${red}Порт 17681 для службы ttyd не прослушивается${plain}"
+   echo -e "${yellow}Порт 17681 может быть ещё не открыт. После перезагрузки служба запустится автоматически.${plain}"
   fi
- fi
-
- if pidof ttyd >/dev/null; then
-	echo -e "Проверка...${green}Служба ttyd запущена.${plain}"
  else
-	echo -e "Проверка...${red}Служба ttyd не запущена! Если у вас Entware, то после перезагрузки роутера служба скорее всего заработает!${plain}"
+  echo -e "${red}Неизвестная ОС для веб-панели. Запустите вручную: python3 /opt/zapret/web/server.py --port $PANEL_PORT --config $WEB_CONFIG${plain}"
+  pause_enter
+  return 1
  fi
- echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}логин: ${ttyd_login} пароль - не испольузется.${plain} Был выполнен выход из скрипта для сохранения состояния."
+ echo -e "${plain}Выполнение установки завершено. ${green}Доступ: http://127.0.0.1:$PANEL_PORT или http://IP_устройства:$PANEL_PORT${plain}"
+ if [ -f "$WEB_CONFIG" ] && grep -q 'AUTH=.' "$WEB_CONFIG" 2>/dev/null; then
+  echo -e "${yellow}Включена HTTP Basic Auth (логин:пароль из .config).${plain}"
+ fi
+ echo -e "${yellow}Для смены привязки или авторизации отредактируйте $WEB_CONFIG и перезапустите службу z4r-web.${plain}"
 }
 
 #Меню, проверка состояний и вывод с чтением ответа
@@ -496,7 +551,7 @@ Enter (без цифр) - переустановка/обновление zapret
 10. (Де)активировать обход UDP на 1026-65531 портах (BF6, Fifa и т.п.). Сейчас: '"${plain}"'['"$(grep -q '^NFQWS_PORTS_UDP=443' /opt/zapret/config && echo "Выключен" || (grep -q '^NFQWS_PORTS_UDP=1026-65531,443' /opt/zapret/config && echo "Включен" || echo "Неизвестно"))"']'"${yellow}"'
 11. Управление аппаратным ускорением zapret. Может увеличить скорость на роутере. Сейчас: '"${plain}"'['"$(grep '^FLOWOFFLOAD=' /opt/zapret/config)"']'"${yellow}"'
 12. Меню (Де)Активации работы по всем доменам TCP-443 без хост-листов (не затрагивает youtube стратегии) (безразборный режим) Сейчас: '"${plain}"'['"$(num=$(sed -n '112,128p' /opt/zapret/config | grep -n '^--filter-tcp=443 --hostlist-domains= --' | head -n1 | cut -d: -f1); [ -n "$num" ] && echo "$num" || echo "Отключен")"']'"${yellow}"'
-13. Активировать доступ в меню через браузер (~3мб места)
+13. Активировать веб-панель управления (без терминала)
 14. Провайдер
 777. Активировать zeefeer premium (Нажимать только Valery ProD, avg97, Xoz, GeGunT, Nomand, Kovi, blagodarenya, mikhyan, Xoz, andric62, Whoze, Necronicle, Andrei_5288515371, Dina_turat, Nergalss, Александру, АлександруП, vecheromholodno, ЕвгениюГ, Dyadyabo, skuwakin, izzzgoy, Grigaraz, Reconnaissance, comandante1928, umad, rudnev2028, rutakote, railwayfx, vtokarev1604, Grigaraz, a40letbezurojaya и subzeero452 и остальным поддержавшим проект. Но если очень хочется - можно нажать и другим)\033[0m'
     if [[ -f "$PREMIUM_FLAG" ]]; then
@@ -615,7 +670,7 @@ Enter (без цифр) - переустановка/обновление zapret
     ;;
 
   "13")
-    ttyd_webssh
+    install_web_panel
     pause_enter
     ;;
 
@@ -786,20 +841,12 @@ remove_zapret
 echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
 version_select
 
-#Запрос на установку web-ssh
+# Запрос на установку веб-панели (выполним после install_zapret_reboot, чтобы не перезаписать /opt/zapret)
 if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
-	ttyd_answer=""
+	INSTALL_WEB_PANEL=""
 else
-	read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
-fi
-case "$ttyd_answer" in
-	"1")
-		ttyd_webssh
-	;;
-	*)
-		echo "Пропуск (пере)установки web-терминала"
-	;;
-esac 
+	read -re -p $'\033[33mАктивировать веб-панель управления? 1 - Да, Enter - нет\033[0m\n' INSTALL_WEB_PANEL
+fi 
  
 #Скачивание, распаковка архива zapret и его удаление
 zapret_get
@@ -819,3 +866,8 @@ fi
 
 #Запуск установочных скриптов и перезагрузка
 install_zapret_reboot
+
+# Установка веб-панели после развёртывания zapret (get_repo уже вызвал deploy_web_files)
+if [ "$INSTALL_WEB_PANEL" = "1" ]; then
+	install_web_panel
+fi

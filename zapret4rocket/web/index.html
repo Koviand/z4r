@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>z4r — панель управления</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 1rem; max-width: 640px; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .status { background: #f0f0f0; padding: 0.75rem; border-radius: 6px; margin: 0.75rem 0; }
+    .status.on { background: #e0f7e0; }
+    .status.off { background: #f7e0e0; }
+    .row { margin: 0.25rem 0; }
+    .buttons { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    button { padding: 0.5rem 0.75rem; cursor: pointer; border-radius: 4px; border: 1px solid #888; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .msg { margin: 0.5rem 0; padding: 0.5rem; border-radius: 4px; }
+    .msg.ok { background: #e0f7e0; }
+    .msg.err { background: #f7e0e0; }
+    .log { white-space: pre-wrap; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>z4r — панель управления</h1>
+  <div id="status" class="status">
+    <div class="row">Загрузка…</div>
+  </div>
+  <div class="buttons">
+    <button type="button" id="btnRefresh">Обновить статус</button>
+    <button type="button" id="btnRestart">Перезапуск zapret</button>
+    <button type="button" id="btnStop">Стоп zapret</button>
+    <button type="button" id="btnCheck">Проверка доступности</button>
+  </div>
+  <div id="message"></div>
+
+  <script>
+    var statusEl = document.getElementById('status');
+    var msgEl = document.getElementById('message');
+    var btnRefresh = document.getElementById('btnRefresh');
+    var btnRestart = document.getElementById('btnRestart');
+    var btnStop = document.getElementById('btnStop');
+    var btnCheck = document.getElementById('btnCheck');
+
+    function showMsg(text, isError) {
+      msgEl.textContent = text;
+      msgEl.className = 'msg ' + (isError ? 'err' : 'ok');
+      msgEl.style.display = 'block';
+    }
+
+    function clearMsg() {
+      msgEl.style.display = 'none';
+    }
+
+    function setLoading(loading) {
+      [btnRefresh, btnRestart, btnStop, btnCheck].forEach(function(b) { b.disabled = loading; });
+    }
+
+    function renderStatus(data) {
+      if (!data) {
+        statusEl.innerHTML = '<div class="row">Ошибка загрузки статуса</div>';
+        statusEl.className = 'status off';
+        return;
+      }
+      var running = data.zapret_running === true;
+      statusEl.className = 'status ' + (running ? 'on' : 'off');
+      statusEl.innerHTML =
+        '<div class="row"><strong>Zapret:</strong> ' + (running ? 'Запущен' : 'Остановлен') + '</div>' +
+        '<div class="row"><strong>Стратегии:</strong> ' + (data.strategies || '—') + '</div>' +
+        '<div class="row"><strong>Провайдер:</strong> ' + (data.provider || '—') + '</div>' +
+        '<div class="row"><strong>FLOWOFFLOAD:</strong> ' + (data.flowoffload || '—') + '</div>' +
+        '<div class="row"><strong>FWTYPE:</strong> ' + (data.fwtype || '—') + '</div>' +
+        '<div class="row"><strong>TCP443 режим:</strong> ' + (data.tcp443_mode === '0' ? 'Выкл' : data.tcp443_mode) + '</div>';
+    }
+
+    function fetchStatus() {
+      setLoading(true);
+      fetch('/api/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          renderStatus(data);
+          clearMsg();
+        })
+        .catch(function(e) {
+          renderStatus(null);
+          showMsg('Ошибка: ' + (e.message || 'сеть'), true);
+        })
+        .finally(function() { setLoading(false); });
+    }
+
+    function postAction(action, label) {
+      setLoading(true);
+      clearMsg();
+      fetch('/api/' + action, { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.ok) {
+            showMsg(label + ' выполнено.', false);
+            fetchStatus();
+          } else {
+            showMsg(label + ' ошибка: ' + (data.error || 'неизвестно'), true);
+          }
+        })
+        .catch(function(e) {
+          showMsg('Ошибка: ' + (e.message || 'сеть'), true);
+        })
+        .finally(function() { setLoading(false); });
+    }
+
+    btnRefresh.addEventListener('click', fetchStatus);
+    btnRestart.addEventListener('click', function() { postAction('restart', 'Перезапуск'); });
+    btnStop.addEventListener('click', function() { postAction('stop', 'Остановка'); });
+    btnCheck.addEventListener('click', function() {
+      setLoading(true);
+      clearMsg();
+      fetch('/api/check', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var text = (data.log || (data.ok ? 'OK' : 'Ошибка')) + (data.error ? '\n' + data.error : '');
+          showMsg(text, !data.ok);
+          if (data.log) msgEl.classList.add('log');
+        })
+        .catch(function(e) { showMsg('Ошибка: ' + (e.message || 'сеть'), true); })
+        .finally(function() { setLoading(false); });
+    });
+
+    fetchStatus();
+    setInterval(fetchStatus, 30000);
+  </script>
+</body>
+</html>
