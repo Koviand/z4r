@@ -33,6 +33,18 @@ Bcyan='\033[46m'
 #Определяем путь скрипта, подгружаем функции
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 
+# Неинтерактивный режим: -y / --yes / --non-interactive
+Z4R_NONINTERACTIVE=0
+Z4R_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes|--non-interactive) Z4R_NONINTERACTIVE=1 ;;
+    *) Z4R_ARGS+=("$arg") ;;
+  esac
+done
+[ "$Z4R_NONINTERACTIVE" = "1" ] && export Z4R_NONINTERACTIVE
+set -- "${Z4R_ARGS[@]}"
+
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
 LIB_DIR="$SCRIPT_DIR/zapret/z4r_lib"
@@ -163,6 +175,38 @@ remove_zapret() {
 
 #Запрос желаемой версии zapret
 version_select() {
+   if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+	VER=""
+	lastest_release="https://api.github.com/repos/bol-van/zapret/releases/latest"
+	echo -e "${yellow}Поиск последней версии...${plain}"
+	VER1=$(curl -sL $lastest_release | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+	if [ ${#VER1} -ge 2 ]; then
+		VER="$VER1"
+		echo -e "${green}Выбрано: $VER (метод: sed -E)${plain}"
+	else
+		VER2=$(curl -sL $lastest_release | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+		if [ ${#VER2} -ge 2 ]; then
+			VER="$VER2"
+			echo -e "${green}Выбрано: $VER (метод: grep+cut)${plain}"
+		else
+			VER3=$(curl -sL $lastest_release | grep '"tag_name":' | sed -r 's/.*"v([^"]+)".*/\1/')
+			if [ ${#VER3} -ge 2 ]; then
+				VER="$VER3"
+				echo -e "${green}Выбрано: $VER (метод: sed -r)${plain}"
+			else
+				VER4=$(curl -sL $lastest_release | grep '"tag_name":' | awk -F'"' '{print $4}' | sed 's/^v//')
+				if [ ${#VER4} -ge 2 ]; then
+					VER="$VER4"
+					echo -e "${green}Выбрано: $VER (метод: awk)${plain}"
+				else
+					echo -e "${yellow}Не удалось получить информацию о последней версии с GitHub. Будет использоваться версия $DEFAULT_VER.${plain}"
+					VER="$DEFAULT_VER"
+				fi
+			fi
+		fi
+	fi
+	return
+   fi
    while true; do
 	read -re -p $'\033[0;32mВведите желаемую версию zapret (Enter для новейшей версии): \033[0m' VER
     # Если пустой ввод — берем значение по умолчанию
@@ -229,6 +273,9 @@ zapret_get() {
 
 #Запуск установочных скриптов и перезагрузка
 install_zapret_reboot() {
+ if [ "$Z4R_NONINTERACTIVE" = "1" ] && [ -f /opt/zapret/common/installer.sh ]; then
+  sed -i 's/if \[ -n "\$1" \] || ask_yes_no N "do you want to continue";/if true;/' /opt/zapret/common/installer.sh
+ fi
  sh -i /opt/zapret/install_easy.sh
  /opt/zapret/init.d/sysv/zapret restart
  if pidof nfqws >/dev/null; then
@@ -633,6 +680,10 @@ elif [[ "$release" == "openwrt" || "$release" == "immortalwrt" || "$release" == 
 elif [[ "$release" == "entware" || "$hardware" = "keenetic" ]]; then
 	OSystem="entware"
 else
+	if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+		echo "Неизвестная ОС в неинтерактивном режиме. Продолжаем как OpenWRT."
+		OSystem="WRT"
+	else
 	read -re -p $'\033[31mДля этой ОС нет подходящей функции. Или ОС определение выполнено некорректно.\033[33m Рекомендуется обратиться в чат поддержки
 Enter - выход
 1 - Плюнуть и продолжить как OpenWRT
@@ -652,7 +703,8 @@ Enter - выход
 		echo "Выбран выход"
 		exit 0
 	;;
-esac 
+esac
+	fi
 fi
 
 #Инфа о времени обновления скрпта
@@ -691,12 +743,16 @@ fi
 
 #Выполнение общего для всех ОС кода с ответвлениями под ОС
 #Запрос на установку 3x-ui или аналогов для VPS
-if [[ "$OSystem" == "VPS" ]] && [ ! $1 ]; then
+if [[ "$OSystem" == "VPS" ]] && [ ! $1 ] && [ "$Z4R_NONINTERACTIVE" != "1" ]; then
  get_panel
 fi
 
 #Меню и быстрый запуск подбора стратегии
  if [ -d /opt/zapret/extra_strats ] && [ -f "/opt/zapret/config" ]; then
+	if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+		echo "Установка уже выполнена. Для меню запустите z4r без -y"
+		exit 0
+	fi
 	if [ $1 ]; then
 		Strats_Tryer $1
 	fi
@@ -726,7 +782,11 @@ echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api
 version_select
 
 #Запрос на установку web-ssh
-read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
+if [ "$Z4R_NONINTERACTIVE" = "1" ]; then
+	ttyd_answer=""
+else
+	read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
+fi
 case "$ttyd_answer" in
 	"1")
 		ttyd_webssh

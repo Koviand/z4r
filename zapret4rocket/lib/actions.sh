@@ -1,4 +1,5 @@
 backup_strats() {
+ [ -n "$Z4R_NONINTERACTIVE" ] && [ "$Z4R_NONINTERACTIVE" = "1" ] && return 0
  # Бэкап папки стратегий
  if [ -d /opt/zapret/extra_strats ]; then
  echo -e "${yellow}Сделать бэкап /opt/zapret/extra_strats ?${plain}"
