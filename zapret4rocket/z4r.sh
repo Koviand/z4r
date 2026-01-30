@@ -394,18 +394,26 @@ install_web_ui() {
   chmod +x /opt/zapret/www/cgi-bin/*.sh 2>/dev/null || true
  fi
 
+ # Проверка наличия апплета httpd в busybox (--list или httpd --help)
+ _busybox_has_httpd() {
+  local b="$1"
+  [ -z "$b" ] || ! command -v "$b" >/dev/null 2>&1 && return 1
+  $b --list 2>/dev/null | grep -qw httpd && return 0
+  $b httpd --help 2>&1 | grep -qiE 'usage|httpd|port|\-p|\-h' && return 0
+  return 1
+ }
  if [[ "$OSystem" == "VPS" ]]; then
   echo -e "${yellow}Настройка веб-панели для VPS${plain}"
   systemctl stop z4r-web 2>/dev/null || true
   HTTPD_CMD=""
   for cmd in busybox /usr/bin/busybox /opt/bin/busybox; do
-   if command -v "$cmd" >/dev/null 2>&1 && $cmd httpd --help 2>&1 | grep -q '\-p'; then
+   if _busybox_has_httpd "$cmd"; then
     HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
     break
    fi
   done
   if [ -z "$HTTPD_CMD" ]; then
-   echo -e "${yellow}busybox httpd не найден. Установите busybox-static или настройте nginx/apache с CGI для /opt/zapret/www.${plain}"
+   echo -e "${yellow}busybox httpd не найден (апплет httpd может отсутствовать в сборке). Установите busybox с httpd или настройте nginx/apache с CGI для /opt/zapret/www.${plain}"
    return 0
   fi
   cat > /etc/systemd/system/z4r-web.service <<'SVC'
@@ -443,23 +451,29 @@ SVC
  elif [[ "$OSystem" == "entware" ]]; then
   echo -e "${yellow}Настройка веб-панели для Entware${plain}"
   HTTPD_CMD=""
-  for cmd in /opt/bin/busybox busybox; do
-   if command -v "$cmd" >/dev/null 2>&1 && $cmd httpd --help 2>&1 | grep -q '\-p'; then
+  for cmd in /opt/bin/busybox /usr/bin/busybox busybox; do
+   if _busybox_has_httpd "$cmd"; then
     HTTPD_CMD="$cmd httpd -p 17681 -h /opt/zapret/www -c /cgi-bin"
     break
    fi
   done
   if [ -z "$HTTPD_CMD" ]; then
-   echo -e "${yellow}busybox httpd не найден. opkg install busybox.${plain}"
+   echo -e "${yellow}У busybox нет апплета httpd (opkg install busybox, в сборке должен быть httpd). Либо включите веб-панель через uhttpd на OpenWrt.${plain}"
    return 0
   fi
   cat > /opt/etc/init.d/S99z4r-web <<'INIT'
 #!/bin/sh
 START=99
+_has_httpd() {
+  [ -z "$1" ] && return 1
+  $1 --list 2>/dev/null | grep -qw httpd && return 0
+  $1 httpd --help 2>&1 | grep -qiE 'usage|httpd|port|\-p|\-h' && return 0
+  return 1
+}
 case "$1" in
   start)
-    for b in /opt/bin/busybox busybox; do
-      [ -x "$b" ] && $b httpd -p 17681 -h /opt/zapret/www -c /cgi-bin & break
+    for b in /opt/bin/busybox /usr/bin/busybox busybox; do
+      [ -x "$b" ] 2>/dev/null && _has_httpd "$b" && $b httpd -p 17681 -h /opt/zapret/www -c /cgi-bin & break
     done
     ;;
   stop)

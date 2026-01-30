@@ -1,6 +1,6 @@
 # ---- Recomendations module ----
 
-RECS_URL="${REPO_RAW:-https://raw.githubusercontent.com/Koviand/z4r_web/4/zapret4rocket}/recommendations.txt"
+RECS_URL="https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/recommendations.txt"
 RECS_FILE="/opt/zapret/extra_strats/cache/recommendations.txt"
 
 # 1. Функция обновления базы

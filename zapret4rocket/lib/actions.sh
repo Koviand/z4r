@@ -34,7 +34,7 @@ backup_strats() {
 
 
 menu_action_update_config_reset() {
- echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/${REPO_API}/commits?path=zapret4rocket/config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+ echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
 
  backup_strats
 
