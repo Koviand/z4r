@@ -22,8 +22,11 @@ init_telemetry() {
  # 1. Загружаем конфиг, если он есть
  [ -f "$TELEMETRY_CFG" ] && source "$TELEMETRY_CFG"
 
- # 2. Если статус еще не задан — спрашиваем
+ # 2. Если статус еще не задан — спрашиваем (в авто-режиме отключаем без вопроса)
  if [ -z "$tel_enabled" ]; then
+ if [ "$Z4R_AUTO" = "1" ]; then
+ tel_enabled="0"
+ else
  echo ""
  echo -e "${green}Хотите отправлять анонимную статистику (Провайдер + Стратегии)?${plain}"
  echo -e "Это поможет понять, какие стратегии работают лучше всего."
@@ -34,16 +37,17 @@ init_telemetry() {
  *) tel_enabled="0" ;;
  esac
 
- # Сразу сохраняем выбор
- echo "tel_enabled=$tel_enabled" > "$TELEMETRY_CFG"
- echo "tel_uuid=$tel_uuid" >> "$TELEMETRY_CFG"
-
  if [ "$tel_enabled" == "1" ]; then
  echo -e "${green}Спасибо! Статистика включена.${plain}"
  else
  echo -e "${red}Статистика отключена.${plain}"
  fi
  sleep 1
+ fi
+
+ # Сразу сохраняем выбор
+ echo "tel_enabled=$tel_enabled" > "$TELEMETRY_CFG"
+ echo "tel_uuid=$tel_uuid" >> "$TELEMETRY_CFG"
  fi
 
  # 3. Генерация UUID (если включено и его нет)

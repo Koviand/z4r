@@ -2,6 +2,10 @@
 
 set -e
 
+# Режим полностью автоматической установки (без вопросов)
+Z4R_AUTO="${Z4R_AUTO:-0}"
+export Z4R_AUTO
+
 #Переменная содержащая версию на случай невозможности получить информацию о lastest с github
 DEFAULT_VER="72.6"
 
@@ -53,13 +57,6 @@ if [ "$missing_libs" -ne 0 ]; then
  echo "Ошибка: нет curl или wget для загрузки внешнего z4r."
  exit 1
  fi
-fi
-
-# Режим полностью автоматической установки (без интерактива)
-if [ "$1" = "1" ] || [ "$1" = "auto" ]; then
- AUTO_MODE=1
-else
- AUTO_MODE=0
 fi
 
 #___Сначала идут анонсы функций____
@@ -117,11 +114,11 @@ change_user() {
 #Создаём папки и забираем файлы папок lists, fake, extra_strats, копируем конфиг, скрипты для войсов DS, WA, TG
 get_repo() {
  mkdir -p /opt/zapret/lists /opt/zapret/extra_strats/TCP/{RKN,User,YT,temp,GV} /opt/zapret/extra_strats/UDP/YT
- for listfile in netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do curl -L -o /opt/zapret/lists/$listfile https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/lists/$listfile; done
- curl -L "https://github.com/IndeecFOX/zapret4rocket/raw/master/fake_files.tar.gz" | tar -xz -C /opt/zapret/files/fake
- curl -L -o /opt/zapret/extra_strats/UDP/YT/List.txt https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/extra_strats/UDP/YT/List.txt
- curl -L -o /opt/zapret/extra_strats/TCP/RKN/List.txt https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/extra_strats/TCP/RKN/List.txt
- curl -L -o /opt/zapret/extra_strats/TCP/YT/List.txt https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/extra_strats/TCP/YT/List.txt
+ for listfile in netrogat.txt russia-discord.txt russia-youtube-rtmps.txt russia-youtube.txt russia-youtubeQ.txt tg_cidr.txt; do curl -L -o /opt/zapret/lists/$listfile https://raw.githubusercontent.com/Koviand/zapret4rocket/master/lists/$listfile; done
+ curl -L "https://github.com/Koviand/zapret4rocket/raw/master/fake_files.tar.gz" | tar -xz -C /opt/zapret/files/fake
+ curl -L -o /opt/zapret/extra_strats/UDP/YT/List.txt https://raw.githubusercontent.com/Koviand/zapret4rocket/master/extra_strats/UDP/YT/List.txt
+ curl -L -o /opt/zapret/extra_strats/TCP/RKN/List.txt https://raw.githubusercontent.com/Koviand/zapret4rocket/master/extra_strats/TCP/RKN/List.txt
+ curl -L -o /opt/zapret/extra_strats/TCP/YT/List.txt https://raw.githubusercontent.com/Koviand/zapret4rocket/master/extra_strats/TCP/YT/List.txt
  touch /opt/zapret/lists/autohostlist.txt /opt/zapret/extra_strats/UDP/YT/{1..8}.txt /opt/zapret/extra_strats/TCP/RKN/{1..17}.txt /opt/zapret/extra_strats/TCP/User/{1..17}.txt /opt/zapret/extra_strats/TCP/YT/{1..17}.txt /opt/zapret/extra_strats/TCP/GV/{1..17}.txt /opt/zapret/extra_strats/TCP/temp/{1..17}.txt
  if [ -d /opt/extra_strats ]; then
  rm -rf /opt/zapret/extra_strats
@@ -133,7 +130,7 @@ get_repo() {
  echo "Востановление листа исключений выполнено."
  fi
  #Копирование нашего конфига на замену стандартному и скриптов для войсов DS, WA, TG
- curl -L -o /opt/zapret/config.default https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/config.default
+ curl -L -o /opt/zapret/config.default https://raw.githubusercontent.com/Koviand/zapret4rocket/master/config.default
  if command -v nft >/dev/null 2>&1; then
  sed -i 's/^FWTYPE=iptables$/FWTYPE=nftables/' "/opt/zapret/config.default"
  fi
@@ -171,7 +168,11 @@ remove_zapret() {
 #Запрос желаемой версии zapret
 version_select() {
  while true; do
+ if [ "$Z4R_AUTO" = "1" ]; then
+ VER=""
+ else
  read -re -p $'\033[0;32mВведите желаемую версию zapret (Enter для новейшей версии): \033[0m' VER
+ fi
  # Если пустой ввод — берем значение по умолчанию
  if [ -z "$VER" ]; then
  lastest_release="https://api.github.com/repos/bol-van/zapret/releases/latest"
@@ -249,13 +250,13 @@ install_zapret_reboot() {
 #Для Entware Keenetic + merlin
 entware_fixes() {
  if [ "$hardware" = "keenetic" ]; then
- curl -L -o /opt/zapret/init.d/sysv/zapret https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/Entware/zapret
+ curl -L -o /opt/zapret/init.d/sysv/zapret https://raw.githubusercontent.com/Koviand/zapret4rocket/master/Entware/zapret
  chmod +x /opt/zapret/init.d/sysv/zapret
  echo "Права выданы /opt/zapret/init.d/sysv/zapret"
- curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/Entware/000-zapret.sh
+ curl -L -o /opt/etc/ndm/netfilter.d/000-zapret.sh https://raw.githubusercontent.com/Koviand/zapret4rocket/master/Entware/000-zapret.sh
  chmod +x /opt/etc/ndm/netfilter.d/000-zapret.sh
  echo "Права выданы /opt/etc/ndm/netfilter.d/000-zapret.sh"
- curl -L -o /opt/etc/init.d/S00fix https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/master/Entware/S00fix
+ curl -L -o /opt/etc/init.d/S00fix https://raw.githubusercontent.com/Koviand/zapret4rocket/master/Entware/S00fix
  chmod +x /opt/etc/init.d/S00fix
  echo "Права выданы /opt/etc/init.d/S00fix"
  cp -a /opt/zapret/init.d/custom.d.examples.linux/10-keenetic-udp-fix /opt/zapret/init.d/sysv/custom.d/10-keenetic-udp-fix
@@ -308,8 +309,8 @@ get_panel() {
  echo "Установка 3proxy (by SnoyIatk). Доустановка с apt build-essential для сборки (debian/ubuntu)"
  apt update && apt install build-essential
  bash <(curl -Ls https://raw.githubusercontent.com/SnoyIatk/3proxy/master/3proxyinstall.sh)
- curl -L -o /etc/3proxy/.proxyauth https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/del.proxyauth
- curl -L -o /etc/3proxy/3proxy.cfg https://raw.githubusercontent.com/IndeecFOX/zapret4rocket/refs/heads/master/3proxy.cfg
+ curl -L -o /etc/3proxy/.proxyauth https://raw.githubusercontent.com/Koviand/zapret4rocket/refs/heads/master/del.proxyauth
+ curl -L -o /etc/3proxy/3proxy.cfg https://raw.githubusercontent.com/Koviand/zapret4rocket/refs/heads/master/3proxy.cfg
  elif [[ "$clean_answer" == "MARZBAN" ]]; then
  echo "Установка Marzban"
  bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban.sh)" @ install
@@ -628,8 +629,8 @@ elif [[ "$release" == "openwrt" || "$release" == "immortalwrt" || "$release" == 
 elif [[ "$release" == "entware" || "$hardware" = "keenetic" ]]; then
  OSystem="entware"
 else
- if [ "$AUTO_MODE" = "1" ]; then
- OSystem="entware"
+ if [ "$Z4R_AUTO" = "1" ]; then
+ OSystem="WRT"
  else
  read -re -p $'\033[31mДля этой ОС нет подходящей функции. Или ОС определение выполнено некорректно.\033[33m Рекомендуется обратиться в чат поддержки
 Enter - выход
@@ -655,7 +656,7 @@ esac
 fi
 
 #Инфа о времени обновления скрпта
-commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
+commit_date=$(curl -s --max-time 30 "https://api.github.com/repos/Koviand/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4)
 if [[ -z "$commit_date" ]]; then
  echo -e "${red}Не был получен доступ к api.github.com (таймаут 30 сек). Возможны проблемы при установке.${plain}"
  if [ "$hardware" = "keenetic" ]; then
@@ -666,7 +667,7 @@ if [[ -z "$commit_date" ]]; then
  else
  echo $IP_ghub
  ndmc -c "ip host api.github.com $IP_ghub"
- echo -e "${yellow}zeefeer обновлен (UTC +0): $(curl -s --max-time 10 "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+ echo -e "${yellow}zeefeer обновлен (UTC +0): $(curl -s --max-time 10 "https://api.github.com/repos/Koviand/zapret4rocket/commits?path=z4r.sh&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
  fi
  fi
 else
@@ -690,12 +691,16 @@ fi
 
 #Выполнение общего для всех ОС кода с ответвлениями под ОС
 #Запрос на установку 3x-ui или аналогов для VPS
-if [[ "$OSystem" == "VPS" ]] && [ ! $1 ]; then
+if [[ "$OSystem" == "VPS" ]] && [ ! $1 ] && [ "$Z4R_AUTO" != "1" ]; then
  get_panel
 fi
 
 #Меню и быстрый запуск подбора стратегии
  if [ -d /opt/zapret/extra_strats ] && [ -f "/opt/zapret/config" ]; then
+ if [ "$Z4R_AUTO" = "1" ]; then
+ echo -e "\033[32mУстановка завершена. Запустите z4r для меню.\033[0m"
+ exit 0
+ fi
  if [ $1 ]; then
  Strats_Tryer $1
  fi
@@ -715,47 +720,28 @@ mkdir -p /opt
 cd /tmp
 
 #Запрос на резервирование стратегий, если есть что резервировать
-[ "$AUTO_MODE" != "1" ] && backup_strats
+backup_strats
 
 #Удаление старого запрета, если есть
 remove_zapret
 
 #Запрос желаемой версии zapret
-echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
-if [ "$AUTO_MODE" = "1" ]; then
- lastest_release="https://api.github.com/repos/bol-van/zapret/releases/latest"
- echo -e "${yellow}Автоустановка: поиск последней версии zapret...${plain}"
- VER1=$(curl -sL $lastest_release | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
- if [ "${#VER1}" -ge 2 ]; then
-  VER="$VER1"
- else
-  VER2=$(curl -sL $lastest_release | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
-  if [ "${#VER2}" -ge 2 ]; then VER="$VER2"; else
-   VER3=$(curl -sL $lastest_release | grep '"tag_name":' | sed -r 's/.*"v([^"]+)".*/\1/')
-   if [ "${#VER3}" -ge 2 ]; then VER="$VER3"; else
-    VER4=$(curl -sL $lastest_release | grep '"tag_name":' | awk -F'"' '{print $4}' | sed 's/^v//')
-    if [ "${#VER4}" -ge 2 ]; then VER="$VER4"; else VER="$DEFAULT_VER"; fi
-   fi
-  fi
- fi
- echo -e "${green}Выбрано: $VER${plain}"
-else
- version_select
-fi
+echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/Koviand/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+version_select
 
 #Запрос на установку web-ssh
-if [ "$AUTO_MODE" != "1" ]; then
+if [ "$Z4R_AUTO" != "1" ]; then
  read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
  case "$ttyd_answer" in
-  "1")
-  ttyd_webssh
-  ;;
-  *)
-  echo "Пропуск (пере)установки web-терминала"
-  ;;
- esac
+ "1")
+ ttyd_webssh
+ ;;
+ *)
+ echo "Пропуск (пере)установки web-терминала"
+ ;;
+esac
 else
- echo "Пропуск (пере)установки web-терминала (авторежим)"
+ echo "Пропуск (пере)установки web-терминала (авто-режим)"
 fi 
  
 #Скачивание, распаковка архива zapret и его удаление

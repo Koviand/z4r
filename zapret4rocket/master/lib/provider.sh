@@ -103,6 +103,7 @@ provider_force_redetect() {
 }
 
 provider_set_manual_menu() {
+ [ "$Z4R_AUTO" = "1" ] && return 0
  read -re -p "Провайдер (например MTS/Beeline): " p
  read -re -p "Город (можно пусто): " c
 

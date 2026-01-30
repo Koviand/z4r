@@ -1,4 +1,7 @@
 backup_strats() {
+ # В авто-режиме пропускаем запросы на бэкап
+ [ "$Z4R_AUTO" = "1" ] && return 0
+
  # Бэкап папки стратегий
  if [ -d /opt/zapret/extra_strats ]; then
  echo -e "${yellow}Сделать бэкап /opt/zapret/extra_strats ?${plain}"
@@ -33,7 +36,7 @@ backup_strats() {
 
 
 menu_action_update_config_reset() {
- echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
+ echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/Koviand/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
 
  backup_strats
 
