@@ -35,77 +35,72 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 
 # Проверяем наличие всех нужных lib-файлов, иначе запускаем внешний скрипт
 missing_libs=0
-# Сначала проверяем структуру репозитория (lib/), затем структуру установки (zapret/z4r_lib/)
-LIB_DIR=""
-if [ -d "$SCRIPT_DIR/lib" ] && [ -f "$SCRIPT_DIR/lib/ui.sh" ]; then
- LIB_DIR="$SCRIPT_DIR/lib"
-elif [ -d "$SCRIPT_DIR/zapret/z4r_lib" ] && [ -f "$SCRIPT_DIR/zapret/z4r_lib/ui.sh" ]; then
- LIB_DIR="$SCRIPT_DIR/zapret/z4r_lib"
-else
+LIB_DIR="$SCRIPT_DIR/zapret/z4r_lib"
+for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh; do
+ if [ ! -f "$LIB_DIR/$lib" ]; then
  missing_libs=1
-fi
-
-# Проверяем наличие всех библиотек
-if [ "$missing_libs" -eq 0 ]; then
- for lib in ui.sh provider.sh telemetry.sh recommendations.sh netcheck.sh premium.sh strategies.sh submenus.sh actions.sh; do
-  if [ ! -f "$LIB_DIR/$lib" ]; then
-   missing_libs=1
-   break
-  fi
- done
-fi
+ break
+ fi
+done
 
 if [ "$missing_libs" -ne 0 ]; then
- echo "Не найдены нужные файлы в $SCRIPT_DIR/lib или $SCRIPT_DIR/zapret/z4r_lib. Запускаю внешний z4r..."
+ echo "Не найдены нужные файлы в $LIB_DIR. Запускаю внешний z4r..."
  if command -v curl >/dev/null 2>&1; then
- exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/Koviand/z4r/4/z4r" | sh'
+ exec sh -c 'curl -fsSL "https://raw.githubusercontent.com/Koviand/z4r/main/z4r" | sh'
  elif command -v wget >/dev/null 2>&1; then
- exec sh -c 'wget -qO- "https://raw.githubusercontent.com/Koviand/z4r/4/z4r" | sh'
+ exec sh -c 'wget -qO- "https://raw.githubusercontent.com/Koviand/z4r/main/z4r" | sh'
  else
  echo "Ошибка: нет curl или wget для загрузки внешнего z4r."
  exit 1
  fi
 fi
 
+# Режим полностью автоматической установки (без интерактива)
+if [ "$1" = "1" ] || [ "$1" = "auto" ]; then
+ AUTO_MODE=1
+else
+ AUTO_MODE=0
+fi
+
 #___Сначала идут анонсы функций____
 
 # UI helpers (пауза/печать пунктов меню/совместимость старого кода)
 # Функции: pause_enter, submenu_item, exit_to_menu
-source "$LIB_DIR/ui.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/ui.sh" 
 
 # Определение провайдера/города + ручная установка/сброс кэша
 # Функции: provider_init_once, provider_force_redetect, provider_set_manual_menu
 # (внутр.: _detect_api_simple)
-source "$LIB_DIR/provider.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/provider.sh" 
 
 # Телеметрия (вкл/выкл один раз + отправка статистики в Google Forms)
 # Функции: init_telemetry, send_stats
-source "$LIB_DIR/telemetry.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/telemetry.sh" 
 
 # База подсказок по стратегиям (скачивание + вывод подсказки по провайдеру)
 # Функции: update_recommendations, show_hint
-source "$LIB_DIR/recommendations.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/recommendations.sh" 
 
 # Проверка доступности ресурсов/сети (TLS 1.2/1.3) + получение домена кластера youtube (googlevideo)
 # Функции: get_yt_cluster_domain, check_access, check_access_list
-source "$LIB_DIR/netcheck.sh"
+source "$SCRIPT_DIR/zapret/z4r_lib/netcheck.sh"
 
 # "Premium" пункты 777/999 и их вспомогательные эффекты (рандом, спиннер, титулы)
 # Функции: rand_from_list, spinner_for_seconds, premium_get_or_set_title, zefeer_premium_777, zefeer_space_999
-source "$LIB_DIR/premium.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/premium.sh" 
 
 # Логика стратегий: определение активной стратегии, статус строкой, перебор стратегий, быстрый подбор
 # Функции: get_active_strat_num, get_current_strategies_info, try_strategies, Strats_Tryer
-source "$LIB_DIR/strategies.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/strategies.sh" 
 
 # Подменю (UI-обвязка над Strats_Tryer + доп. меню управления: FLOWOFFLOAD, TCP443, провайдер)
 # Функции: strategies_submenu, flowoffload_submenu, tcp443_submenu, provider_submenu
-source "$LIB_DIR/submenus.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/submenus.sh" 
 
 # Действия меню (бэкапы/сбросы/переключатели)
 # Функции: backup_strats, menu_action_update_config_reset, menu_action_toggle_bolvan_ports,
 # menu_action_toggle_fwtype, menu_action_toggle_udp_range
-source "$LIB_DIR/actions.sh" 
+source "$SCRIPT_DIR/zapret/z4r_lib/actions.sh" 
 
 change_user() {
  if /opt/zapret/nfq/nfqws --dry-run --user="nobody" 2>&1 | grep -q "queue"; then
@@ -175,18 +170,10 @@ remove_zapret() {
 
 #Запрос желаемой версии zapret
 version_select() {
- # В автоматическом режиме используем последнюю версию без запроса
- if [ "$AUTO_MODE" = "1" ]; then
-  VER=""
-  echo -e "${green}Автоматический режим: используется последняя версия zapret${plain}"
- fi
- 
  while true; do
-  if [ "$AUTO_MODE" = "0" ]; then
-   read -re -p $'\033[0;32mВведите желаемую версию zapret (Enter для новейшей версии): \033[0m' VER
-  fi
-  # Если пустой ввод — берем значение по умолчанию
-  if [ -z "$VER" ]; then
+ read -re -p $'\033[0;32mВведите желаемую версию zapret (Enter для новейшей версии): \033[0m' VER
+ # Если пустой ввод — берем значение по умолчанию
+ if [ -z "$VER" ]; then
  lastest_release="https://api.github.com/repos/bol-van/zapret/releases/latest"
  # проверяем результаты по порядку
  echo -e "${yellow}Поиск последней версии...${plain}"
@@ -228,11 +215,9 @@ version_select() {
  echo "Некорректный формат версии. Пример: 72.3"
  continue
  fi
-  if [ "$AUTO_MODE" = "0" ]; then
-   echo "Будет использоваться версия: $VER"
-  fi
-  break
- done
+ echo "Будет использоваться версия: $VER"
+ break
+done
 }
 
 #Скачивание, распаковка архива zapret, очистка от ненуных бинарей
@@ -254,9 +239,7 @@ install_zapret_reboot() {
  sh -i /opt/zapret/install_easy.sh
  /opt/zapret/init.d/sysv/zapret restart
  if pidof nfqws >/dev/null; then
- if [ "$AUTO_MODE" = "0" ]; then
-  check_access_list
- fi
+ check_access_list
  echo -e "\033[32mzapret перезапущен и полностью установлен\n\033[33mЕсли требуется меню (например не работают какие-то ресурсы) - введите скрипт ещё раз или просто напишите "z4r" в терминале. Саппорт: tg: zee4r\033[0m"
  else
  echo -e "${yellow}zapret полностью установлен, но не обнаружен после запуска в исполняемых задачах через pidof\nСаппорт: tg: zee4r${plain}"
@@ -310,17 +293,11 @@ entware_fixes() {
 
 #Запрос на установку 3x-ui или аналогов
 get_panel() {
- # В автоматическом режиме пропускаем установку панели
- if [ "$AUTO_MODE" = "1" ]; then
-  echo "Автоматический режим: пропуск установки ПО туннелирования."
-  return 0
- fi
- 
  read -re -p $'\033[33mУстановить ПО для туннелирования?\033[0m \033[32m(3xui, marzban, wg, 3proxy или Enter для пропуска): \033[0m' answer_panel
  # Удаляем лишние символы и пробелы, приводим к верхнему регистру
  clean_answer=$(echo "$answer_panel" | tr '[:lower:]' '[:upper:]')
  if [[ -z "$clean_answer" ]]; then
-  echo "Пропуск установки ПО туннелирования."
+ echo "Пропуск установки ПО туннелирования."
  elif [[ "$clean_answer" == "3XUI" ]]; then
  echo "Установка 3x-ui панели."
  bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
@@ -368,7 +345,7 @@ After=network.target
 Type=simple
 ExecStart=/usr/bin/ttyd -p 17681 -W -a ${ttyd_login_have} bash z4r
 Restart=always
-RestartSec=5
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
@@ -376,6 +353,14 @@ EOF
  systemctl daemon-reload
  systemctl enable ttyd
  systemctl start ttyd
+ sleep 2
+ if systemctl is-active --quiet ttyd > /dev/null; then
+ echo -e "Проверка...${green}Служба ttyd запущена.${plain}"
+ else
+ echo -e "Проверка...${red}Служба ttyd не запущена!${plain}"
+ fi
+ echo -e "${plain}Выполнение установки завершено. ${green}Доступ по ip вашего роутера/VPS в формате ip:17681, например 192.168.1.1:17681 или mydomain.com:17681 ${yellow}логин: ${ttyd_login} пароль - не испольузется.${plain} Был выполнен выход из скрипта для сохранения состояния."
+ exit 0
  elif [[ "$OSystem" == "WRT" ]]; then
  echo -e "${yellow}Установка ttyd for OpenWRT${plain}"
  /etc/init.d/ttyd stop 2>/dev/null || true
@@ -402,11 +387,11 @@ PATH=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:
 . /opt/etc/init.d/rc.func
 EOF
  chmod +x /opt/etc/init.d/S99ttyd
- /opt/etc/init.d/S99ttyd enable
  /opt/etc/init.d/S99ttyd start
  fi
  
- if pidof ttyd >/dev/null; then
+ sleep 2
+ if pidof ttyd > /dev/null; then
  echo -e "Проверка...${green}Служба ttyd запущена.${plain}"
  else
  echo -e "Проверка...${red}Служба ttyd не запущена! Если у вас Entware, то после перезагрузки роутера служба скорее всего заработает!${plain}"
@@ -643,6 +628,9 @@ elif [[ "$release" == "openwrt" || "$release" == "immortalwrt" || "$release" == 
 elif [[ "$release" == "entware" || "$hardware" = "keenetic" ]]; then
  OSystem="entware"
 else
+ if [ "$AUTO_MODE" = "1" ]; then
+ OSystem="entware"
+ else
  read -re -p $'\033[31mДля этой ОС нет подходящей функции. Или ОС определение выполнено некорректно.\033[33m Рекомендуется обратиться в чат поддержки
 Enter - выход
 1 - Плюнуть и продолжить как OpenWRT
@@ -662,38 +650,8 @@ Enter - выход
  echo "Выбран выход"
  exit 0
  ;;
-esac 
-fi
-
-#Выбор режима установки
-AUTO_MODE=0
-export AUTO_MODE
-# Если передан аргумент "1" - автоматический режим, иначе - интерактивный выбор
-if [ "$1" = "1" ]; then
- AUTO_MODE=1
- echo -e "${green}Автоматический режим установки активирован${plain}"
- echo ""
-elif [ ! $1 ]; then
- echo ""
- echo -e "${cyan}=== Режим установки ===${plain}"
- echo -e "${yellow}Выберите режим установки:${plain}"
- echo -e "  ${green}1${plain} - Ручной режим (требуется ввод от пользователя)"
- echo -e "  ${green}2${plain} - Полностью автоматический режим"
- read -re -p $'\033[33mВаш выбор (1 или 2, Enter = 1): \033[0m' install_mode
- if [ -z "$install_mode" ]; then
-  install_mode="1"
+esac
  fi
- case "$install_mode" in
-  "2")
-   AUTO_MODE=1
-   echo -e "${green}Выбран автоматический режим установки${plain}"
-   ;;
-  *)
-   AUTO_MODE=0
-   echo -e "${green}Выбран ручной режим установки${plain}"
-   ;;
- esac
- echo ""
 fi
 
 #Инфа о времени обновления скрпта
@@ -741,13 +699,7 @@ fi
  if [ $1 ]; then
  Strats_Tryer $1
  fi
- # В автоматическом режиме не показываем меню после установки
- if [ "$AUTO_MODE" = "0" ]; then
-  get_menu
- else
-  echo -e "${green}Автоматическая установка завершена успешно!${plain}"
-  echo -e "${yellow}Для доступа к меню управления запустите скрипт ещё раз или введите 'z4r' в терминале.${plain}"
- fi
+ get_menu
  fi
  
 #entware keenetic and merlin preinstal env.
@@ -763,28 +715,47 @@ mkdir -p /opt
 cd /tmp
 
 #Запрос на резервирование стратегий, если есть что резервировать
-backup_strats
+[ "$AUTO_MODE" != "1" ] && backup_strats
 
 #Удаление старого запрета, если есть
 remove_zapret
 
 #Запрос желаемой версии zapret
 echo -e "${yellow}Конфиг обновлен (UTC +0): $(curl -s "https://api.github.com/repos/IndeecFOX/zapret4rocket/commits?path=config.default&per_page=1" | grep '"date"' | head -n1 | cut -d'"' -f4) ${plain}"
-version_select
+if [ "$AUTO_MODE" = "1" ]; then
+ lastest_release="https://api.github.com/repos/bol-van/zapret/releases/latest"
+ echo -e "${yellow}Автоустановка: поиск последней версии zapret...${plain}"
+ VER1=$(curl -sL $lastest_release | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+ if [ "${#VER1}" -ge 2 ]; then
+  VER="$VER1"
+ else
+  VER2=$(curl -sL $lastest_release | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+  if [ "${#VER2}" -ge 2 ]; then VER="$VER2"; else
+   VER3=$(curl -sL $lastest_release | grep '"tag_name":' | sed -r 's/.*"v([^"]+)".*/\1/')
+   if [ "${#VER3}" -ge 2 ]; then VER="$VER3"; else
+    VER4=$(curl -sL $lastest_release | grep '"tag_name":' | awk -F'"' '{print $4}' | sed 's/^v//')
+    if [ "${#VER4}" -ge 2 ]; then VER="$VER4"; else VER="$DEFAULT_VER"; fi
+   fi
+  fi
+ fi
+ echo -e "${green}Выбрано: $VER${plain}"
+else
+ version_select
+fi
 
 #Запрос на установку web-ssh
-if [ "$AUTO_MODE" = "1" ]; then
- echo "Автоматический режим: пропуск установки web-терминала"
-else
+if [ "$AUTO_MODE" != "1" ]; then
  read -re -p $'\033[33mАктивировать доступ в меню через браузер (~3мб места)? 1 - Да, Enter - нет\033[0m\n' ttyd_answer
  case "$ttyd_answer" in
   "1")
-   ttyd_webssh
-   ;;
+  ttyd_webssh
+  ;;
   *)
-   echo "Пропуск (пере)установки web-терминала"
-   ;;
+  echo "Пропуск (пере)установки web-терминала"
+  ;;
  esac
+else
+ echo "Пропуск (пере)установки web-терминала (авторежим)"
 fi 
  
 #Скачивание, распаковка архива zapret и его удаление

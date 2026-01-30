@@ -531,4 +531,4 @@ Pargolovo - Smart Home Limited Liability Company|UDP:4, 2|TCP:|RKN:15
 Paris - CGI GLOBAL LIMITED|UDP:3|TCP:|RKN:17 
 Penza - CJSC ER-Telecom Holding Kazan branch|UDP:1|TCP:|RKN:7 
 Penza - CJSC ER-Telecom Holding Penza branch|UDP:0|TCP:|RKN:9 
-Penza - MTS Penza|UDP:4, 0, 7|TCP:|RKN:0 
+Penza - MTS Penza|UDP:4, 0, 7|TCP:|RKN:0

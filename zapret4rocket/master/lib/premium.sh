@@ -1,7 +1,5 @@
 # ---- ZEFEER PREMIUM (777/999) ----
 # Сделано исключительно ради мемов. Практического смысла не несёт. 
-# Используем тот же CACHE_DIR, что и в telemetry.sh
-[ -z "$CACHE_DIR" ] && CACHE_DIR="/opt/zapret/extra_strats/cache"
 PREMIUM_FLAG="$CACHE_DIR/premium.enabled"
 PREMIUM_TITLE_FILE="$CACHE_DIR/premium.title"
 

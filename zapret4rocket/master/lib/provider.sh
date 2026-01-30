@@ -114,4 +114,3 @@ provider_set_manual_menu() {
  PROVIDER_MENU="$res"
 }
 # ---- /Provider detector integration ----
-
